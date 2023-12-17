@@ -32,7 +32,6 @@ impl StickCoordinate {
 static IS_ALTERNATIVE_ACTIVE: AtomicBool = AtomicBool::new(false);
 static LEFT_STICK_COORD: StickCoordinate = StickCoordinate::new();
 static RIGHT_STICK_COORD: StickCoordinate = StickCoordinate::new();
-static CURR_REPEAT_KEY: std::sync::Mutex<Option<enigo::Key>> = std::sync::Mutex::new(None);
 
 lazy_static! {
     static ref CONFIG: Config = {
@@ -42,9 +41,10 @@ lazy_static! {
         config.check_error().unwrap()
     };
     static ref ENIGO: std::sync::Mutex<Enigo> = std::sync::Mutex::new(Enigo::new(&enigo::Settings::default()).unwrap());
+    static ref REPEAT_KEY_TASK_HANDLE: std::sync::Mutex<Option<tokio::task::JoinHandle<()>>> = std::sync::Mutex::new(None);
 }
 
-fn press_input(input_name: &str, is_press_down: bool) {
+async fn press_input(input_name: &str, is_press_down: bool) {
     if let Some(activator) = &CONFIG.alternative_activator {
         if input_name == activator {
             IS_ALTERNATIVE_ACTIVE.store(is_press_down, Ordering::Relaxed);
@@ -70,11 +70,18 @@ fn press_input(input_name: &str, is_press_down: bool) {
             Remap::Repeat(key) => {
                 if is_press_down {
                     ENIGO.lock().unwrap().key(*key, Direction::Click).unwrap();
-                    std::thread::sleep(CONFIG.key_repeat_initial_delay);
+                    *REPEAT_KEY_TASK_HANDLE.lock().unwrap() = Some(tokio::spawn(async {
+                        tokio::time::sleep(CONFIG.key_repeat_initial_delay).await;
 
-                    *CURR_REPEAT_KEY.lock().unwrap() = Some(*key);
+                        loop {
+                            ENIGO.lock().unwrap().key(*key, Direction::Click).unwrap();
+                            tokio::time::sleep(CONFIG.key_repeat_sub_delay).await;
+                        }
+                    }));
                 } else {
-                    *CURR_REPEAT_KEY.lock().unwrap() = None;
+                    if let Some(handle) = &*REPEAT_KEY_TASK_HANDLE.lock().unwrap() {
+                        handle.abort();
+                    }
                 }
             }
             Remap::Mouse(button) => {
@@ -97,17 +104,7 @@ fn press_input(input_name: &str, is_press_down: bool) {
     }
 }
 
-fn repeat_key() {
-    loop {
-        if let Some(key) = *CURR_REPEAT_KEY.lock().unwrap() {
-            ENIGO.lock().unwrap().key(key, Direction::Click).unwrap();
-        }
-
-        std::thread::sleep(CONFIG.key_repeat_sub_delay);
-    }
-}
-
-fn left_stick() {
+async fn left_stick() {
     let mouse_acceleration = (CONFIG.mouse_max_speed - CONFIG.mouse_initial_speed) / (CONFIG.mouse_ticks_to_reach_max_speed as f32);
     let mut curr_mouse_speed = CONFIG.mouse_initial_speed;
 
@@ -126,11 +123,11 @@ fn left_stick() {
             curr_mouse_speed = CONFIG.mouse_initial_speed;
         }
 
-        std::thread::sleep(CONFIG.left_stick_poll_interval);
+        tokio::time::sleep(CONFIG.left_stick_poll_interval).await;
     }
 }
 
-fn right_stick() {
+async fn right_stick() {
     let trigger_angle_precompute = [
         1. * std::f32::consts::FRAC_PI_8,
         3. * std::f32::consts::FRAC_PI_8,
@@ -146,7 +143,7 @@ fn right_stick() {
 
         if distance_to_origin <= CONFIG.right_stick_dead_zone {
             if let Some(input_name) = pressed_input_name {
-                press_input(input_name, false);
+                press_input(input_name, false).await;
                 pressed_input_name = None;
             }
         } else if distance_to_origin >= CONFIG.right_stick_trigger_zone && pressed_input_name.is_none() {
@@ -165,11 +162,11 @@ fn right_stick() {
             };
 
             if let Some(input_name) = pressed_input_name {
-                press_input(input_name, true);
+                press_input(input_name, true).await;
             }
         }
 
-        std::thread::sleep(CONFIG.right_stick_poll_interval);
+        tokio::time::sleep(CONFIG.right_stick_poll_interval).await;
     }
 }
 
@@ -195,12 +192,12 @@ fn get_button_input_name(button: gilrs::Button) -> Option<&'static str> {
     }
 }
 
-fn main() {
+#[tokio::main(worker_threads = 3)]
+async fn main() {
     let mut gilrs = Gilrs::new().unwrap();
 
-    std::thread::spawn(repeat_key);
-    std::thread::spawn(left_stick);
-    std::thread::spawn(right_stick);
+    tokio::spawn(left_stick());
+    tokio::spawn(right_stick());
 
     loop {
         while let Some(Event { event, .. }) = gilrs.next_event_blocking(None) {
@@ -209,16 +206,15 @@ fn main() {
                     IS_ALTERNATIVE_ACTIVE.store(false, Ordering::Relaxed);
                     LEFT_STICK_COORD.reset();
                     RIGHT_STICK_COORD.reset();
-                    *CURR_REPEAT_KEY.lock().unwrap() = None;
                 }
                 EventType::ButtonPressed(button, ..) => {
                     if let Some(input_name) = get_button_input_name(button) {
-                        press_input(input_name, true);
+                        press_input(input_name, true).await;
                     }
                 }
                 EventType::ButtonReleased(button, ..) => {
                     if let Some(input_name) = get_button_input_name(button) {
-                        press_input(input_name, false);
+                        press_input(input_name, false).await;
                     }
                 }
                 EventType::AxisChanged(axis, value, ..) => match axis {

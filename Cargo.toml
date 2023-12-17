@@ -5,8 +5,9 @@ edition = '2021'
 
 [dependencies]
 enigo = { version = '0.2.0-rc2', default-features = false, features = ['serde', 'wayland'] }
-gilrs = { version = '*', default-features = false, features = ['serde', 'xinput'] }
+gilrs = { version = '*', features = ['serde'] }
 lazy_static = '*'
 serde = '*'
 shlex = '*'
+tokio = { version = '*', features = ['macros', 'process', 'rt-multi-thread', 'sync', 'time'] }
 toml = '*'
