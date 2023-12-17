@@ -1,193 +1,235 @@
+mod atomic_f32;
 mod config;
-mod input;
 
-use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
-use std::sync::mpsc::{sync_channel, SyncSender};
-use std::sync::{Mutex, OnceLock};
-use std::thread::sleep;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-use sdl2::controller::Axis;
-use sdl2::event::Event;
+use enigo::{Direction, Enigo, Keyboard, Mouse};
+use gilrs::{Axis, Event, EventType, Gilrs};
+use lazy_static::lazy_static;
 
-use crate::config::Config;
-#[cfg(target_os = "linux")]
-use crate::input::windows::LinuxInput as PlatformInput;
-#[cfg(target_os = "windows")]
-use crate::input::windows::WindowsInput as PlatformInput;
-use crate::input::KeyPressType;
+use crate::atomic_f32::AtomicF32;
+use crate::config::{Config, Remap};
 
-static CONFIG_LOCK: OnceLock<Config> = OnceLock::new();
+struct StickCoordinate {
+    x: AtomicF32,
+    y: AtomicF32,
+}
+
+impl StickCoordinate {
+    const fn new() -> Self {
+        Self {
+            x: AtomicF32::new(),
+            y: AtomicF32::new(),
+        }
+    }
+
+    fn reset(&self) {
+        self.x.reset();
+        self.y.reset();
+    }
+}
+
 static IS_ALTERNATIVE_ACTIVE: AtomicBool = AtomicBool::new(false);
-static LEFT_STICK_COORD: (AtomicI32, AtomicI32) = (AtomicI32::new(0), AtomicI32::new(0));
-static RIGHT_STICK_COORD: (AtomicI32, AtomicI32) = (AtomicI32::new(0), AtomicI32::new(0));
-static REPEAT_KEY_SIGNAL: Mutex<Option<SyncSender<bool>>> = Mutex::new(None);
+static LEFT_STICK_COORD: StickCoordinate = StickCoordinate::new();
+static RIGHT_STICK_COORD: StickCoordinate = StickCoordinate::new();
+static CURR_REPEAT_KEY: std::sync::Mutex<Option<enigo::Key>> = std::sync::Mutex::new(None);
 
-fn press(name: &str, is_press_down: bool) {
-    let config = CONFIG_LOCK.get().unwrap();
+lazy_static! {
+    static ref CONFIG: Config = {
+        let config_path = std::env::current_exe().unwrap().with_extension("toml");
+        let config_str = std::fs::read_to_string(&config_path).unwrap_or_else(|_| panic!("Unable to open config file at {}", config_path.display()));
+        let config = toml::from_str::<Config>(&config_str).unwrap();
+        config.check_error().unwrap()
+    };
+    static ref ENIGO: std::sync::Mutex<Enigo> = std::sync::Mutex::new(Enigo::new(&enigo::Settings::default()).unwrap());
+}
 
-    if let Some(alt_input) = &config.alternative_activation {
-        if name == alt_input {
+fn press_input(input_name: &str, is_press_down: bool) {
+    if let Some(activator) = &CONFIG.alternative_activator {
+        if input_name == activator {
             IS_ALTERNATIVE_ACTIVE.store(is_press_down, Ordering::Relaxed);
             return;
         }
     }
 
-    if let Some(remap) = config.get_remap(name, IS_ALTERNATIVE_ACTIVE.load(Ordering::Relaxed)) {
+    if let Some(remap) = CONFIG.get_remap(input_name, IS_ALTERNATIVE_ACTIVE.load(Ordering::Relaxed)) {
         match remap {
-            crate::config::Remap::keys(seq) => {
+            Remap::Seq(seq) => {
+                let mut enigo = ENIGO.lock().unwrap();
+
                 if is_press_down {
-                    PlatformInput::press(&seq, KeyPressType::Down);
+                    for key in seq {
+                        enigo.key(*key, Direction::Press).unwrap();
+                    }
                 } else {
-                    PlatformInput::press(&seq.iter().rev().collect::<Vec<_>>(), KeyPressType::Up);
+                    for key in seq.iter().rev() {
+                        enigo.key(*key, Direction::Release).unwrap();
+                    }
                 }
             }
-            crate::config::Remap::repeat(key) => {
-                let mut signal_lock = REPEAT_KEY_SIGNAL.lock().unwrap();
+            Remap::Repeat(key) => {
+                if is_press_down {
+                    ENIGO.lock().unwrap().key(*key, Direction::Click).unwrap();
+                    std::thread::sleep(CONFIG.key_repeat_initial_delay);
 
-                if let Some(signal) = signal_lock.as_ref() {
-                    signal.send(false).unwrap();
-                }
-
-                *signal_lock = if is_press_down {
-                    let (tx, rx) = sync_channel(0);
-
-                    std::thread::spawn(move || {
-                        PlatformInput::press(&[key], KeyPressType::DownAndUp);
-
-                        sleep(config.key_initial_delay_multi);
-
-                        while rx.try_recv().is_err() {
-                            PlatformInput::press(&[key], KeyPressType::DownAndUp);
-                            sleep(config.key_repeat_delay);
-                        }
-                    });
-
-                    Some(tx)
+                    *CURR_REPEAT_KEY.lock().unwrap() = Some(*key);
                 } else {
-                    None
-                };
+                    *CURR_REPEAT_KEY.lock().unwrap() = None;
+                }
+            }
+            Remap::Mouse(button) => {
+                ENIGO
+                    .lock()
+                    .unwrap()
+                    .button(*button, if is_press_down { Direction::Press } else { Direction::Release })
+                    .unwrap();
+            }
+            Remap::Command(cmdline) => {
+                if is_press_down {
+                    if let Some(components) = shlex::split(cmdline) {
+                        if !components.is_empty() {
+                            std::process::Command::new(&components[0]).args(&components[1..]).spawn().unwrap();
+                        }
+                    }
+                }
             }
         }
+    }
+}
+
+fn repeat_key() {
+    loop {
+        if let Some(key) = *CURR_REPEAT_KEY.lock().unwrap() {
+            ENIGO.lock().unwrap().key(key, Direction::Click).unwrap();
+        }
+
+        std::thread::sleep(CONFIG.key_repeat_sub_delay);
     }
 }
 
 fn left_stick() {
-    let config = CONFIG_LOCK.get().unwrap();
-    let mut curr_mouse_acceleration = config.initial_mouse_speed_div;
+    let mouse_acceleration = (CONFIG.mouse_max_speed - CONFIG.mouse_initial_speed) / (CONFIG.mouse_ticks_to_reach_max_speed as f32);
+    let mut curr_mouse_speed = CONFIG.mouse_initial_speed;
 
     loop {
-        let x = LEFT_STICK_COORD.0.load(Ordering::Relaxed);
-        let y: i32 = LEFT_STICK_COORD.1.load(Ordering::Relaxed);
-        let distance_to_origin = ((x * x + y * y) as f32).sqrt();
-        let dead_zone_shrink_ratio = (1. - (config.left_stick_dead_zone) / distance_to_origin).max(0.);
-        let delta_x = ((x as f32) * dead_zone_shrink_ratio / curr_mouse_acceleration) as i32;
-        let delta_y = ((y as f32) * dead_zone_shrink_ratio / curr_mouse_acceleration) as i32;
+        let x = LEFT_STICK_COORD.x.load();
+        let y = LEFT_STICK_COORD.y.load();
+        let distance_to_origin = (x * x + y * y).sqrt();
+        let dead_zone_shrink_ratio = (1. - (CONFIG.left_stick_dead_zone) / distance_to_origin).max(0.);
+        let delta_x = x * dead_zone_shrink_ratio * curr_mouse_speed;
+        let delta_y = y * dead_zone_shrink_ratio * curr_mouse_speed;
 
-        if delta_x != 0 || delta_y != 0 {
-            PlatformInput::move_mouse(delta_x, delta_y);
-            curr_mouse_acceleration = (curr_mouse_acceleration - config.mouse_acceleration_rate).max(config.max_mouse_speed_div);
+        if delta_x != 0. || delta_y != 0. {
+            ENIGO.lock().unwrap().move_mouse(delta_x as i32, -delta_y as i32, enigo::Coordinate::Rel).unwrap();
+            curr_mouse_speed = (curr_mouse_speed + mouse_acceleration).min(CONFIG.mouse_max_speed);
         } else {
-            curr_mouse_acceleration = config.initial_mouse_speed_div;
+            curr_mouse_speed = CONFIG.mouse_initial_speed;
         }
 
-        sleep(config.left_stick_poll_interval);
+        std::thread::sleep(CONFIG.left_stick_poll_interval);
     }
 }
 
 fn right_stick() {
-    let config = CONFIG_LOCK.get().unwrap();
     let trigger_angle_precompute = [
-        std::f32::consts::FRAC_PI_8,
+        1. * std::f32::consts::FRAC_PI_8,
         3. * std::f32::consts::FRAC_PI_8,
         5. * std::f32::consts::FRAC_PI_8,
         7. * std::f32::consts::FRAC_PI_8,
     ];
-    let mut pressed_input_name: Option<String> = None;
+    let mut pressed_input_name = None;
 
     loop {
-        let x = RIGHT_STICK_COORD.0.load(Ordering::Relaxed);
-        let y = RIGHT_STICK_COORD.1.load(Ordering::Relaxed);
-        let distance_to_origin = ((x * x + y * y) as f32).sqrt();
+        let x = RIGHT_STICK_COORD.x.load();
+        let y = RIGHT_STICK_COORD.y.load();
+        let distance_to_origin = (x * x + y * y).sqrt();
 
-        if distance_to_origin <= config.right_stick_dead_zone {
-            if let Some(input_name) = pressed_input_name.as_ref() {
-                press(input_name, true);
+        if distance_to_origin <= CONFIG.right_stick_dead_zone {
+            if let Some(input_name) = pressed_input_name {
+                press_input(input_name, false);
                 pressed_input_name = None;
             }
-        } else if distance_to_origin >= config.right_stick_trigger_zone && pressed_input_name.is_none() {
-            let stick_angle = (y as f32).atan2(x as f32);
+        } else if distance_to_origin >= CONFIG.right_stick_trigger_zone && pressed_input_name.is_none() {
+            let stick_angle = y.atan2(x);
 
-            pressed_input_name = if stick_angle >= -trigger_angle_precompute[2] && stick_angle <= -trigger_angle_precompute[1] {
-                // up
-                Some(sdl2::controller::Button::Paddle1.string())
-            } else if stick_angle >= trigger_angle_precompute[1] && stick_angle <= trigger_angle_precompute[2] {
-                // down
-                Some(sdl2::controller::Button::Paddle2.string())
+            pressed_input_name = if stick_angle >= trigger_angle_precompute[1] && stick_angle <= trigger_angle_precompute[2] {
+                Some("right_stick_up")
+            } else if stick_angle >= -trigger_angle_precompute[2] && stick_angle <= -trigger_angle_precompute[1] {
+                Some("right_stick_down")
             } else if stick_angle >= trigger_angle_precompute[3] || stick_angle <= -trigger_angle_precompute[3] {
-                // left
-                Some(sdl2::controller::Button::Paddle3.string())
+                Some("right_stick_left")
             } else if stick_angle >= -trigger_angle_precompute[0] && stick_angle <= trigger_angle_precompute[0] {
-                // right
-                Some(sdl2::controller::Button::Paddle4.string())
+                Some("right_stick_right")
             } else {
                 None
             };
 
-            if let Some(input_name) = pressed_input_name.as_ref() {
-                press(input_name, true);
+            if let Some(input_name) = pressed_input_name {
+                press_input(input_name, true);
             }
         }
 
-        sleep(config.right_stick_poll_interval);
+        std::thread::sleep(CONFIG.right_stick_poll_interval);
+    }
+}
+
+fn get_button_input_name(button: gilrs::Button) -> Option<&'static str> {
+    match button {
+        gilrs::Button::North => Some("north"),
+        gilrs::Button::South => Some("south"),
+        gilrs::Button::West => Some("west"),
+        gilrs::Button::East => Some("east"),
+        gilrs::Button::LeftTrigger => Some("left_bumper"),
+        gilrs::Button::RightTrigger => Some("right_bumper"),
+        gilrs::Button::LeftTrigger2 => Some("left_trigger"),
+        gilrs::Button::RightTrigger2 => Some("right_trigger"),
+        gilrs::Button::Select => Some("select"),
+        gilrs::Button::Start => Some("start"),
+        gilrs::Button::LeftThumb => Some("left_thumb"),
+        gilrs::Button::RightThumb => Some("right_thumb"),
+        gilrs::Button::DPadUp => Some("dpad_up"),
+        gilrs::Button::DPadDown => Some("dpad_down"),
+        gilrs::Button::DPadLeft => Some("dpad_left"),
+        gilrs::Button::DPadRight => Some("dpad_right"),
+        _ => None,
     }
 }
 
 fn main() {
-    let config_path = std::env::current_exe().unwrap().with_extension("toml");
-    let config_str = std::fs::read_to_string(&config_path).unwrap_or_else(|_| panic!("Unable to open config file at {}", config_path.display()));
-    let config = toml::from_str::<Config>(&config_str).unwrap();
-    config.check_validity().unwrap();
-    CONFIG_LOCK.set(config).unwrap();
+    let mut gilrs = Gilrs::new().unwrap();
 
-    let sdl_context = sdl2::init().unwrap();
-    let mut event_pump = sdl_context.event_pump().unwrap();
+    std::thread::spawn(repeat_key);
+    std::thread::spawn(left_stick);
+    std::thread::spawn(right_stick);
 
-    let controller_sys = sdl_context.game_controller().unwrap();
-    let mut opt_controller = None;
-
-    std::thread::scope(|s| {
-        s.spawn(left_stick);
-        s.spawn(right_stick);
-
-        loop {
-            for event in event_pump.wait_iter() {
-                match event {
-                    Event::ControllerDeviceAdded { which, .. } => opt_controller = Some(controller_sys.open(which).unwrap()),
-                    Event::ControllerDeviceRemoved { .. } => {
-                        if CONFIG_LOCK.get().unwrap().run_once {
-                            std::process::exit(0);
-                        } else {
-                            let mut signal_lock = REPEAT_KEY_SIGNAL.lock().unwrap();
-                            if let Some(signal) = signal_lock.as_ref() {
-                                signal.send(false).unwrap();
-                                *signal_lock = None;
-                            }
-
-                            opt_controller = None;
-                        }
-                    }
-                    Event::ControllerButtonDown { button, .. } => press(&button.string(), true),
-                    Event::ControllerButtonUp { button, .. } => press(&button.string(), false),
-                    Event::ControllerAxisMotion { axis, value, .. } => match axis {
-                        Axis::LeftX => LEFT_STICK_COORD.0.store(value as _, Ordering::Relaxed),
-                        Axis::LeftY => LEFT_STICK_COORD.1.store(value as _, Ordering::Relaxed),
-                        Axis::RightX => RIGHT_STICK_COORD.0.store(value as _, Ordering::Relaxed),
-                        Axis::RightY => RIGHT_STICK_COORD.1.store(value as _, Ordering::Relaxed),
-                        Axis::TriggerLeft | Axis::TriggerRight => press(&axis.string(), value > 0),
-                    },
-                    _ => (),
+    loop {
+        while let Some(Event { event, .. }) = gilrs.next_event_blocking(None) {
+            match event {
+                EventType::Disconnected => {
+                    IS_ALTERNATIVE_ACTIVE.store(false, Ordering::Relaxed);
+                    LEFT_STICK_COORD.reset();
+                    RIGHT_STICK_COORD.reset();
+                    *CURR_REPEAT_KEY.lock().unwrap() = None;
                 }
+                EventType::ButtonPressed(button, ..) => {
+                    if let Some(input_name) = get_button_input_name(button) {
+                        press_input(input_name, true);
+                    }
+                }
+                EventType::ButtonReleased(button, ..) => {
+                    if let Some(input_name) = get_button_input_name(button) {
+                        press_input(input_name, false);
+                    }
+                }
+                EventType::AxisChanged(axis, value, ..) => match axis {
+                    Axis::LeftStickX => LEFT_STICK_COORD.x.store(value),
+                    Axis::LeftStickY => LEFT_STICK_COORD.y.store(value),
+                    Axis::RightStickX => RIGHT_STICK_COORD.x.store(value),
+                    Axis::RightStickY => RIGHT_STICK_COORD.y.store(value),
+                    _ => (),
+                },
+                _ => (),
             }
         }
-    });
+    }
 }

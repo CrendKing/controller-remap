@@ -4,12 +4,9 @@ version = '0.1.0'
 edition = '2021'
 
 [dependencies]
-sdl2 = '*'
-serde = { version = '*', features = ['derive'] }
+enigo = { version = '0.2.0-rc2', default-features = false, features = ['serde', 'wayland'] }
+gilrs = { version = '*', default-features = false, features = ['serde', 'xinput'] }
+lazy_static = '*'
+serde = '*'
+shlex = '*'
 toml = '*'
-
-[target.'cfg(target_os = "windows")'.dependencies]
-windows-sys = { version = '*', features = ['Win32_UI_Input_KeyboardAndMouse'] }
-
-[target.'cfg(target_os = "linux")'.dependencies]
-uinput = '*'
