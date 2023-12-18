@@ -194,6 +194,14 @@ fn get_button_input_name(button: gilrs::Button) -> Option<&'static str> {
 
 #[tokio::main(worker_threads = 3)]
 async fn main() {
+    // we don't care about the terminal state of the user command processes, and don't want them to become zombies
+    // set SA_NOCLDWAIT to the SIGCHLD signal
+    #[cfg(target_os = "linux")]
+    unsafe {
+        use nix::sys::signal::*;
+        sigaction(Signal::SIGCHLD, &SigAction::new(SigHandler::SigDfl, SaFlags::SA_NOCLDWAIT, SigSet::empty())).unwrap();
+    }
+
     let mut gilrs = Gilrs::new().unwrap();
 
     tokio::spawn(left_stick());
@@ -209,12 +217,12 @@ async fn main() {
                 }
                 EventType::ButtonPressed(button, ..) => {
                     if let Some(input_name) = get_button_input_name(button) {
-                        press_input(input_name, true).await;
+                        tokio::spawn(press_input(input_name, true));
                     }
                 }
                 EventType::ButtonReleased(button, ..) => {
                     if let Some(input_name) = get_button_input_name(button) {
-                        press_input(input_name, false).await;
+                        tokio::spawn(press_input(input_name, false));
                     }
                 }
                 EventType::AxisChanged(axis, value, ..) => match axis {

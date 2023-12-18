@@ -11,3 +11,6 @@ serde = '*'
 shlex = '*'
 tokio = { version = '*', features = ['macros', 'process', 'rt-multi-thread', 'sync', 'time'] }
 toml = '*'
+
+[target.'cfg(target_os = "linux")'.dependencies]
+nix = { version = '*', default-features = false, features = ['signal'] }

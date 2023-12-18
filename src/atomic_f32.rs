@@ -18,6 +18,6 @@ impl AtomicF32 {
     }
 
     pub fn reset(&self) {
-        self.store(0.);
+        self.storage.store(0, Ordering::Relaxed);
     }
 }
