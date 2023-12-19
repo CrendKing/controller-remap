@@ -4,12 +4,13 @@ version = '0.1.0'
 edition = '2021'
 
 [dependencies]
+duration-str = '*'
 enigo = { version = '0.2.0-rc2', default-features = false, features = ['serde', 'wayland'] }
 gilrs = { version = '*', features = ['serde'] }
 lazy_static = '*'
 serde = '*'
 shlex = '*'
-tokio = { version = '*', features = ['macros', 'process', 'rt-multi-thread', 'sync', 'time'] }
+tokio = { version = '*', features = ['macros', 'rt-multi-thread', 'time'] }
 toml = '*'
 
 [target.'cfg(target_os = "linux")'.dependencies]
