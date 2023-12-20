@@ -78,10 +78,8 @@ async fn press_input(input_name: &str, is_press_down: bool) {
                             tokio::time::sleep(CONFIG.key_repeat_sub_delay).await;
                         }
                     }));
-                } else {
-                    if let Some(handle) = &*REPEAT_KEY_TASK_HANDLE.lock().unwrap() {
-                        handle.abort();
-                    }
+                } else if let Some(handle) = &*REPEAT_KEY_TASK_HANDLE.lock().unwrap() {
+                    handle.abort();
                 }
             }
             Remap::Mouse(button) => {
@@ -105,7 +103,7 @@ async fn press_input(input_name: &str, is_press_down: bool) {
 }
 
 async fn left_stick() {
-    let mouse_acceleration = (CONFIG.mouse_max_speed - CONFIG.mouse_initial_speed) / (CONFIG.mouse_ticks_to_reach_max_speed as f32);
+    let mouse_acceleration = (CONFIG.mouse_max_speed - CONFIG.mouse_initial_speed) / CONFIG.mouse_ticks_to_reach_max_speed;
     let mut curr_mouse_speed = CONFIG.mouse_initial_speed;
 
     loop {

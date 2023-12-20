@@ -25,7 +25,7 @@ pub struct Config {
 
     pub mouse_initial_speed: f32,
     pub mouse_max_speed: f32,
-    pub mouse_ticks_to_reach_max_speed: u32,
+    pub mouse_ticks_to_reach_max_speed: f32,
 
     #[serde(deserialize_with = "deserialize_duration")]
     pub right_stick_poll_interval: Duration,
