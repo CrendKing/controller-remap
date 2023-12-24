@@ -10,12 +10,12 @@ use lazy_static::lazy_static;
 use crate::atomic_f32::AtomicF32;
 use crate::config::{Config, Remap};
 
-struct StickCoordinate {
+struct Coordinate {
     x: AtomicF32,
     y: AtomicF32,
 }
 
-impl StickCoordinate {
+impl Coordinate {
     const fn new() -> Self {
         Self {
             x: AtomicF32::new(),
@@ -30,8 +30,8 @@ impl StickCoordinate {
 }
 
 static IS_ALTERNATIVE_ACTIVE: AtomicBool = AtomicBool::new(false);
-static LEFT_STICK_COORD: StickCoordinate = StickCoordinate::new();
-static RIGHT_STICK_COORD: StickCoordinate = StickCoordinate::new();
+static LEFT_STICK_COORD: Coordinate = Coordinate::new();
+static RIGHT_STICK_COORD: Coordinate = Coordinate::new();
 
 lazy_static! {
     static ref CONFIG: Config = {
@@ -70,6 +70,7 @@ async fn press_input(input_name: &str, is_press_down: bool) {
             Remap::Repeat(key) => {
                 if is_press_down {
                     ENIGO.lock().unwrap().key(*key, Direction::Click).unwrap();
+
                     *REPEAT_KEY_TASK_HANDLE.lock().unwrap() = Some(tokio::spawn(async {
                         tokio::time::sleep(CONFIG.key_repeat_initial_delay).await;
 
@@ -180,6 +181,7 @@ fn get_button_input_name(button: gilrs::Button) -> Option<&'static str> {
         gilrs::Button::RightTrigger2 => Some("right_trigger"),
         gilrs::Button::Select => Some("select"),
         gilrs::Button::Start => Some("start"),
+        gilrs::Button::Mode => Some("mode"),
         gilrs::Button::LeftThumb => Some("left_thumb"),
         gilrs::Button::RightThumb => Some("right_thumb"),
         gilrs::Button::DPadUp => Some("dpad_up"),
@@ -205,33 +207,31 @@ async fn main() {
     tokio::spawn(left_stick());
     tokio::spawn(right_stick());
 
-    loop {
-        while let Some(Event { event, .. }) = gilrs.next_event_blocking(None) {
-            match event {
-                EventType::Disconnected => {
-                    IS_ALTERNATIVE_ACTIVE.store(false, Ordering::Relaxed);
-                    LEFT_STICK_COORD.reset();
-                    RIGHT_STICK_COORD.reset();
-                }
-                EventType::ButtonPressed(button, ..) => {
-                    if let Some(input_name) = get_button_input_name(button) {
-                        tokio::spawn(press_input(input_name, true));
-                    }
-                }
-                EventType::ButtonReleased(button, ..) => {
-                    if let Some(input_name) = get_button_input_name(button) {
-                        tokio::spawn(press_input(input_name, false));
-                    }
-                }
-                EventType::AxisChanged(axis, value, ..) => match axis {
-                    Axis::LeftStickX => LEFT_STICK_COORD.x.store(value),
-                    Axis::LeftStickY => LEFT_STICK_COORD.y.store(value),
-                    Axis::RightStickX => RIGHT_STICK_COORD.x.store(value),
-                    Axis::RightStickY => RIGHT_STICK_COORD.y.store(value),
-                    _ => (),
-                },
-                _ => (),
+    while let Some(Event { event, .. }) = gilrs.next_event_blocking(None) {
+        match event {
+            EventType::Disconnected => {
+                IS_ALTERNATIVE_ACTIVE.store(false, Ordering::Relaxed);
+                LEFT_STICK_COORD.reset();
+                RIGHT_STICK_COORD.reset();
             }
+            EventType::ButtonPressed(button, ..) => {
+                if let Some(input_name) = get_button_input_name(button) {
+                    tokio::spawn(press_input(input_name, true));
+                }
+            }
+            EventType::ButtonReleased(button, ..) => {
+                if let Some(input_name) = get_button_input_name(button) {
+                    tokio::spawn(press_input(input_name, false));
+                }
+            }
+            EventType::AxisChanged(axis, value, ..) => match axis {
+                Axis::LeftStickX => LEFT_STICK_COORD.x.store(value),
+                Axis::LeftStickY => LEFT_STICK_COORD.y.store(value),
+                Axis::RightStickX => RIGHT_STICK_COORD.x.store(value),
+                Axis::RightStickY => RIGHT_STICK_COORD.y.store(value),
+                _ => (),
+            },
+            _ => (),
         }
     }
 }
