@@ -194,6 +194,11 @@ fn get_button_input_name(button: gilrs::Button) -> Option<&'static str> {
 
 #[tokio::main(worker_threads = 3)]
 async fn main() {
+    let instance = single_instance::SingleInstance::new(&std::env::current_exe().unwrap().file_name().unwrap().to_string_lossy()).unwrap();
+    if !instance.is_single() {
+        return;
+    }
+
     // we don't care about the terminal state of the user command processes, and don't want them to become zombies
     // set SA_NOCLDWAIT to the SIGCHLD signal
     #[cfg(target_os = "linux")]

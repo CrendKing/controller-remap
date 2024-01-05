@@ -10,6 +10,7 @@ gilrs = { version = '*', features = ['serde'] }
 lazy_static = '*'
 serde = '*'
 shlex = '*'
+single-instance = '*'
 tokio = { version = '*', features = ['macros', 'rt-multi-thread', 'time'] }
 toml = '*'
 
