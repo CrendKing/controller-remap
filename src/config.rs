@@ -58,7 +58,6 @@ impl Config {
     }
 
     pub fn get_remap(&self, input: &str, is_alternative: bool) -> Option<&Remap> {
-        let active_set = if !is_alternative { &self.main } else { &self.alt };
-        active_set.get(input)
+        if !is_alternative { &self.main } else { &self.alt }.get(input)
     }
 }

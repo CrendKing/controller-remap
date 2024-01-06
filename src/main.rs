@@ -41,7 +41,7 @@ lazy_static! {
         config.check_error().unwrap()
     };
     static ref ENIGO: std::sync::Mutex<Enigo> = std::sync::Mutex::new(Enigo::new(&enigo::Settings::default()).unwrap());
-    static ref REPEAT_KEY_TASK_HANDLE: std::sync::Mutex<Option<tokio::task::JoinHandle<()>>> = std::sync::Mutex::new(None);
+    static ref REPEAT_KEY_ABORT_HANDLE: std::sync::Mutex<Option<tokio::task::AbortHandle>> = std::sync::Mutex::new(None);
 }
 
 async fn press_input(input_name: &str, is_press_down: bool) {
@@ -68,19 +68,26 @@ async fn press_input(input_name: &str, is_press_down: bool) {
                 }
             }
             Remap::Repeat(key) => {
+                let mut abort_handle_lock = REPEAT_KEY_ABORT_HANDLE.lock().unwrap();
+
+                if let Some(handle) = abort_handle_lock.as_ref() {
+                    handle.abort();
+                }
+
                 if is_press_down {
                     ENIGO.lock().unwrap().key(*key, Direction::Click).unwrap();
 
-                    *REPEAT_KEY_TASK_HANDLE.lock().unwrap() = Some(tokio::spawn(async {
-                        tokio::time::sleep(CONFIG.key_repeat_initial_delay).await;
+                    *abort_handle_lock = Some(
+                        tokio::spawn(async {
+                            tokio::time::sleep(CONFIG.key_repeat_initial_delay).await;
 
-                        loop {
-                            ENIGO.lock().unwrap().key(*key, Direction::Click).unwrap();
-                            tokio::time::sleep(CONFIG.key_repeat_sub_delay).await;
-                        }
-                    }));
-                } else if let Some(handle) = &*REPEAT_KEY_TASK_HANDLE.lock().unwrap() {
-                    handle.abort();
+                            loop {
+                                ENIGO.lock().unwrap().key(*key, Direction::Click).unwrap();
+                                tokio::time::sleep(CONFIG.key_repeat_sub_delay).await;
+                            }
+                        })
+                        .abort_handle(),
+                    );
                 }
             }
             Remap::Mouse(button) => {
