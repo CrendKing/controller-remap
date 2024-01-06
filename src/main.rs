@@ -212,31 +212,33 @@ async fn main() {
     tokio::spawn(left_stick());
     tokio::spawn(right_stick());
 
-    while let Some(Event { event, .. }) = gilrs.next_event_blocking(None) {
-        match event {
-            EventType::Disconnected => {
-                IS_ALTERNATIVE_ACTIVE.store(false, Ordering::Relaxed);
-                LEFT_STICK_COORD.reset();
-                RIGHT_STICK_COORD.reset();
-            }
-            EventType::ButtonPressed(button, ..) => {
-                if let Some(input_name) = get_button_input_name(button) {
-                    tokio::spawn(press_input(input_name, true));
+    loop {
+        if let Some(Event { event, .. }) = gilrs.next_event_blocking(None) {
+            match event {
+                EventType::Disconnected => {
+                    IS_ALTERNATIVE_ACTIVE.store(false, Ordering::Relaxed);
+                    LEFT_STICK_COORD.reset();
+                    RIGHT_STICK_COORD.reset();
                 }
-            }
-            EventType::ButtonReleased(button, ..) => {
-                if let Some(input_name) = get_button_input_name(button) {
-                    tokio::spawn(press_input(input_name, false));
+                EventType::ButtonPressed(button, ..) => {
+                    if let Some(input_name) = get_button_input_name(button) {
+                        tokio::spawn(press_input(input_name, true));
+                    }
                 }
-            }
-            EventType::AxisChanged(axis, value, ..) => match axis {
-                Axis::LeftStickX => LEFT_STICK_COORD.x.store(value),
-                Axis::LeftStickY => LEFT_STICK_COORD.y.store(value),
-                Axis::RightStickX => RIGHT_STICK_COORD.x.store(value),
-                Axis::RightStickY => RIGHT_STICK_COORD.y.store(value),
+                EventType::ButtonReleased(button, ..) => {
+                    if let Some(input_name) = get_button_input_name(button) {
+                        tokio::spawn(press_input(input_name, false));
+                    }
+                }
+                EventType::AxisChanged(axis, value, ..) => match axis {
+                    Axis::LeftStickX => LEFT_STICK_COORD.x.store(value),
+                    Axis::LeftStickY => LEFT_STICK_COORD.y.store(value),
+                    Axis::RightStickX => RIGHT_STICK_COORD.x.store(value),
+                    Axis::RightStickY => RIGHT_STICK_COORD.y.store(value),
+                    _ => (),
+                },
                 _ => (),
-            },
-            _ => (),
+            }
         }
     }
 }
