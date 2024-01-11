@@ -1,11 +1,13 @@
 [package]
-name = 'controller_remap'
+name = 'controller-remap'
+description = 'Remap controller to keyboard and mouse inputs'
+license-file = 'LICENSE'
 version = '0.1.0'
 edition = '2021'
 
 [dependencies]
 duration-str = '*'
-enigo = { version = '0.2.0-rc2', default-features = false, features = ['serde', 'wayland'] }
+enigo = { version = '0.2.0-rc', default-features = false, features = ['serde', 'wayland'] }
 gilrs = { version = '*', features = ['serde'] }
 lazy_static = '*'
 serde = '*'
