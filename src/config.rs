@@ -6,7 +6,7 @@ use duration_str::deserialize_duration;
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Remap {
-    Seq(Vec<enigo::Key>),
+    Seq(Box<[enigo::Key]>),
     Repeat(enigo::Key),
     Mouse(enigo::Button),
     Command(String),

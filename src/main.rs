@@ -58,7 +58,7 @@ async fn press_input(input_name: &str, is_press_down: bool) {
                 let mut enigo = ENIGO.lock().unwrap();
 
                 if is_press_down {
-                    for key in seq {
+                    for key in seq.iter() {
                         enigo.key(*key, Direction::Press).unwrap();
                     }
                 } else {
