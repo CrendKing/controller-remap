@@ -9,7 +9,7 @@ pub enum Remap {
     Seq(Box<[enigo::Key]>),
     Repeat(enigo::Key),
     Mouse(enigo::Button),
-    Command(String),
+    Command(Box<str>),
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -32,25 +32,25 @@ pub struct Config {
     pub right_stick_trigger_zone: f32,
     pub right_stick_dead_zone: f32,
 
-    pub alternative_activator: Option<String>,
+    pub alternative_activator: Option<Box<str>>,
 
-    pub main: HashMap<String, Remap>,
-    pub alt: HashMap<String, Remap>,
+    pub main: HashMap<Box<str>, Remap>,
+    pub alt: HashMap<Box<str>, Remap>,
 }
 
 impl Config {
-    pub fn check_error(self) -> std::result::Result<Self, String> {
+    pub fn check_error(self) -> std::result::Result<Self, &'static str> {
         if self.left_stick_dead_zone <= 0. || self.right_stick_trigger_zone <= 0. || self.right_stick_dead_zone <= 0. {
-            return Err(String::from("Negative zone size"));
+            return Err("Negative zone size");
         }
 
         if self.right_stick_trigger_zone < self.right_stick_dead_zone {
-            return Err(String::from("Trigger zone smaller than dead zone"));
+            return Err("Trigger zone smaller than dead zone");
         }
 
         if let Some(activator) = &self.alternative_activator {
             if self.main.contains_key(activator) {
-                return Err(String::from("Activator for alternative set is remapped"));
+                return Err("Activator for alternative set is remapped");
             }
         }
 

@@ -46,7 +46,7 @@ lazy_static! {
 
 async fn press_input(input_name: &str, is_press_down: bool) {
     if let Some(activator) = &CONFIG.alternative_activator {
-        if input_name == activator {
+        if input_name == activator.as_ref() {
             IS_ALTERNATIVE_ACTIVE.store(is_press_down, Ordering::Relaxed);
             return;
         }
@@ -70,7 +70,7 @@ async fn press_input(input_name: &str, is_press_down: bool) {
             Remap::Repeat(key) => {
                 let mut abort_handle_lock = REPEAT_KEY_ABORT_HANDLE.lock().unwrap();
 
-                if let Some(handle) = abort_handle_lock.as_ref() {
+                if let Some(handle) = &*abort_handle_lock {
                     handle.abort();
                 }
 
@@ -214,38 +214,42 @@ async fn main() {
         sigaction(Signal::SIGCHLD, &SigAction::new(SigHandler::SigDfl, SaFlags::SA_NOCLDWAIT, SigSet::empty())).unwrap();
     }
 
-    let mut gilrs = Gilrs::new().unwrap();
-
     tokio::spawn(left_stick());
     tokio::spawn(right_stick());
 
     loop {
-        if let Some(Event { event, .. }) = gilrs.next_event_blocking(None) {
-            match event {
-                EventType::Disconnected => {
-                    IS_ALTERNATIVE_ACTIVE.store(false, Ordering::Relaxed);
-                    LEFT_STICK_COORD.reset();
-                    RIGHT_STICK_COORD.reset();
-                }
-                EventType::ButtonPressed(button, ..) => {
-                    if let Some(input_name) = get_button_input_name(button) {
-                        tokio::spawn(press_input(input_name, true));
+        std::panic::catch_unwind(|| {
+            let mut gilrs = Gilrs::new().unwrap();
+            loop {
+                if let Some(Event { event, .. }) = gilrs.next_event_blocking(None) {
+                    match event {
+                        EventType::Disconnected => {
+                            IS_ALTERNATIVE_ACTIVE.store(false, Ordering::Relaxed);
+                            LEFT_STICK_COORD.reset();
+                            RIGHT_STICK_COORD.reset();
+                        }
+                        EventType::ButtonPressed(button, ..) => {
+                            if let Some(input_name) = get_button_input_name(button) {
+                                tokio::spawn(press_input(input_name, true));
+                            }
+                        }
+                        EventType::ButtonReleased(button, ..) => {
+                            if let Some(input_name) = get_button_input_name(button) {
+                                tokio::spawn(press_input(input_name, false));
+                            }
+                        }
+                        EventType::AxisChanged(axis, value, ..) => match axis {
+                            Axis::LeftStickX => LEFT_STICK_COORD.x.store(value),
+                            Axis::LeftStickY => LEFT_STICK_COORD.y.store(value),
+                            Axis::RightStickX => RIGHT_STICK_COORD.x.store(value),
+                            Axis::RightStickY => RIGHT_STICK_COORD.y.store(value),
+                            _ => (),
+                        },
+                        _ => (),
                     }
                 }
-                EventType::ButtonReleased(button, ..) => {
-                    if let Some(input_name) = get_button_input_name(button) {
-                        tokio::spawn(press_input(input_name, false));
-                    }
-                }
-                EventType::AxisChanged(axis, value, ..) => match axis {
-                    Axis::LeftStickX => LEFT_STICK_COORD.x.store(value),
-                    Axis::LeftStickY => LEFT_STICK_COORD.y.store(value),
-                    Axis::RightStickX => RIGHT_STICK_COORD.x.store(value),
-                    Axis::RightStickY => RIGHT_STICK_COORD.y.store(value),
-                    _ => (),
-                },
-                _ => (),
             }
-        }
+        })
+        .ok();
     }
 }
