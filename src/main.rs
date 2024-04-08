@@ -44,7 +44,7 @@ lazy_static! {
     static ref REPEAT_KEY_ABORT_HANDLE: std::sync::Mutex<Option<tokio::task::AbortHandle>> = std::sync::Mutex::new(None);
 }
 
-async fn press_input(input_name: &str, is_press_down: bool) {
+fn press_input(input_name: &str, is_press_down: bool) {
     if let Some(activator) = &CONFIG.alternative_activator {
         if input_name == activator.as_ref() {
             IS_ALTERNATIVE_ACTIVE.store(is_press_down, Ordering::Relaxed);
@@ -55,6 +55,18 @@ async fn press_input(input_name: &str, is_press_down: bool) {
     if let Some(remap) = CONFIG.get_remap(input_name, IS_ALTERNATIVE_ACTIVE.load(Ordering::Relaxed)) {
         match remap {
             Remap::Seq(seq) => {
+                if is_press_down {
+                    let mut enigo = ENIGO.lock().unwrap();
+
+                    for key in seq.iter() {
+                        enigo.key(*key, Direction::Press).unwrap();
+                    }
+                    for key in seq.iter().rev() {
+                        enigo.key(*key, Direction::Release).unwrap();
+                    }
+                }
+            }
+            Remap::Sync(seq) => {
                 let mut enigo = ENIGO.lock().unwrap();
 
                 if is_press_down {
@@ -149,7 +161,7 @@ async fn right_stick() {
 
         if distance_to_origin <= CONFIG.right_stick_dead_zone {
             if let Some(input_name) = pressed_input_name {
-                press_input(input_name, false).await;
+                press_input(input_name, false);
                 pressed_input_name = None;
             }
         } else if distance_to_origin >= CONFIG.right_stick_trigger_zone && pressed_input_name.is_none() {
@@ -168,7 +180,7 @@ async fn right_stick() {
             };
 
             if let Some(input_name) = pressed_input_name {
-                press_input(input_name, true).await;
+                press_input(input_name, true);
             }
         }
 
@@ -230,12 +242,12 @@ async fn main() {
                         }
                         EventType::ButtonPressed(button, ..) => {
                             if let Some(input_name) = get_button_input_name(button) {
-                                tokio::spawn(press_input(input_name, true));
+                                press_input(input_name, true);
                             }
                         }
                         EventType::ButtonReleased(button, ..) => {
                             if let Some(input_name) = get_button_input_name(button) {
-                                tokio::spawn(press_input(input_name, false));
+                                press_input(input_name, false);
                             }
                         }
                         EventType::AxisChanged(axis, value, ..) => match axis {

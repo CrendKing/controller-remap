@@ -38,8 +38,9 @@ The keyboard output names are based on [enigo's naming convention](https://docs.
 
 The mapping value is an one-entry toml table. These are the supported mapping keys:
 
-* `seq`: Value is a list of strings, each being keyboard output name.
-* `repeat`: Value is a single string of keyboard output name.
+* `seq`: Value is a list of strings, each being keyboard output name. Keys are immediately released in reverse order.
+* `sync`: Value is a list of strings, each being keyboard output name. Key releases are synced with the controller button release.
+* `repeat`: Value is a single string of keyboard output name. The key is repeatedly pressed.
 * `mouse`: Value is either `Left`, `Right` or `Middle`.
 * `command`: Value is path to an executable file to run.
 
@@ -64,9 +65,9 @@ west = { repeat = 'PageDown' }
 east = { repeat = 'Space' }
 left_bumper = { mouse = 'Left' }
 right_bumper = { mouse = 'Right' }
-left_trigger = { seq = ['Control'] }
+left_trigger = { sync = ['Control'] }
 right_trigger = { mouse = 'Middle' }
-start = { seq = ['Shift'] }
+start = { sync = ['Shift'] }
 left_thumb = { seq = ['Control', 'R'] }
 right_thumb = { seq = ['Control', 'W'] }
 dpad_up = { repeat = 'UpArrow' }
