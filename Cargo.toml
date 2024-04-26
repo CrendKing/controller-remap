@@ -2,12 +2,12 @@
 name = 'controller-remap'
 description = 'Remap controller to keyboard and mouse inputs'
 license-file = 'LICENSE'
-version = '0.1.0'
+version = '1.0.0'
 edition = '2021'
 
 [dependencies]
 duration-str = '*'
-enigo = { version = '0.2.0-rc', default-features = false, features = ['serde', 'wayland'] }
+enigo = { version = '*', default-features = false, features = ['serde', 'wayland'] }
 gilrs = { version = '*', features = ['serde'] }
 lazy_static = '*'
 serde = '*'
@@ -18,6 +18,3 @@ toml = '*'
 
 [target.'cfg(target_os = "linux")'.dependencies]
 nix = { version = '*', default-features = false, features = ['signal'] }
-
-[patch.crates-io]
-enigo = { git = 'https://github.com/enigo-rs/enigo.git' }
