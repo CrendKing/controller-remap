@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use duration_str::deserialize_duration;
+use if_chain::if_chain;
 
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -49,8 +50,10 @@ impl Config {
             return Err("Trigger zone smaller than dead zone");
         }
 
-        if let Some(activator) = &self.alternative_activator {
-            if self.main.contains_key(activator) {
+        if_chain! {
+            if let Some(activator) = &self.alternative_activator;
+            if self.main.contains_key(activator);
+            then {
                 return Err("Activator for alternative set is remapped");
             }
         }

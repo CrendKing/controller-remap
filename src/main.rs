@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use enigo::{Direction, Enigo, Keyboard, Mouse};
 use gilrs::{Axis, Event, EventType, Gilrs};
+use if_chain::if_chain;
 use lazy_static::lazy_static;
 
 use crate::atomic_f32::AtomicF32;
@@ -45,8 +46,10 @@ lazy_static! {
 }
 
 fn press_input(input_name: &str, is_press_down: bool) {
-    if let Some(activator) = &CONFIG.alternative_activator {
-        if input_name == activator.as_ref() {
+    if_chain! {
+        if let Some(activator) = &CONFIG.alternative_activator;
+        if input_name == activator.as_ref();
+        then {
             IS_ALTERNATIVE_ACTIVE.store(is_press_down, Ordering::Relaxed);
             return;
         }
@@ -110,11 +113,12 @@ fn press_input(input_name: &str, is_press_down: bool) {
                     .unwrap();
             }
             Remap::Command(cmdline) => {
-                if is_press_down {
-                    if let Some(components) = shlex::split(cmdline) {
-                        if !components.is_empty() {
-                            std::process::Command::new(&components[0]).args(&components[1..]).spawn().unwrap();
-                        }
+                if_chain! {
+                    if is_press_down;
+                    if let Some(components) = shlex::split(cmdline);
+                    if !components.is_empty();
+                    then {
+                        std::process::Command::new(&components[0]).args(&components[1..]).spawn().unwrap();
                     }
                 }
             }
