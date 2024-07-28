@@ -10,7 +10,6 @@ duration-str = '*'
 enigo = { version = '*', default-features = false, features = ['serde', 'wayland'] }
 gilrs = { version = '*', features = ['serde'] }
 if_chain = '*'
-lazy_static = '*'
 serde = '*'
 shlex = '*'
 single-instance = '*'

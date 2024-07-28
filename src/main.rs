@@ -2,11 +2,11 @@ mod atomic_f32;
 mod config;
 
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::LazyLock;
 
 use enigo::{Direction, Enigo, Keyboard, Mouse};
 use gilrs::{Axis, Event, EventType, Gilrs};
 use if_chain::if_chain;
-use lazy_static::lazy_static;
 
 use crate::atomic_f32::AtomicF32;
 use crate::config::{Config, Remap};
@@ -34,16 +34,14 @@ static IS_ALTERNATIVE_ACTIVE: AtomicBool = AtomicBool::new(false);
 static LEFT_STICK_COORD: Coordinate = Coordinate::new();
 static RIGHT_STICK_COORD: Coordinate = Coordinate::new();
 
-lazy_static! {
-    static ref CONFIG: Config = {
-        let config_path = std::env::current_exe().unwrap().with_extension("toml");
-        let config_str = std::fs::read_to_string(&config_path).unwrap_or_else(|_| panic!("Unable to open config file at {}", config_path.display()));
-        let config = toml::from_str::<Config>(&config_str).unwrap();
-        config.check_error().unwrap()
-    };
-    static ref ENIGO: std::sync::Mutex<Enigo> = std::sync::Mutex::new(Enigo::new(&enigo::Settings::default()).unwrap());
-    static ref REPEAT_KEY_ABORT_HANDLE: std::sync::Mutex<Option<tokio::task::AbortHandle>> = std::sync::Mutex::new(None);
-}
+static CONFIG: LazyLock<Config> = LazyLock::new(|| {
+    let config_path = std::env::current_exe().unwrap().with_extension("toml");
+    let config_str = std::fs::read_to_string(&config_path).unwrap_or_else(|_| panic!("Unable to open config file at {}", config_path.display()));
+    let config = toml::from_str::<Config>(&config_str).unwrap();
+    config.check_error().unwrap()
+});
+static ENIGO: LazyLock<std::sync::Mutex<Enigo>> = LazyLock::new(|| std::sync::Mutex::new(Enigo::new(&enigo::Settings::default()).unwrap()));
+static REPEAT_KEY_ABORT_HANDLE: std::sync::Mutex<Option<tokio::task::AbortHandle>> = std::sync::Mutex::new(None);
 
 fn press_input(input_name: &str, is_press_down: bool) {
     if_chain! {
