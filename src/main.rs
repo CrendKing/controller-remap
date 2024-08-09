@@ -8,8 +8,8 @@ use enigo::{Direction, Enigo, Keyboard, Mouse};
 use gilrs::{Axis, Event, EventType, Gilrs};
 use if_chain::if_chain;
 
-use crate::atomic_f32::AtomicF32;
-use crate::config::{Config, Remap};
+use crate::atomic_f32::*;
+use crate::config::*;
 
 struct Coordinate {
     x: AtomicF32,
