@@ -148,7 +148,7 @@ async fn left_stick() {
 }
 
 async fn right_stick() {
-    let trigger_angle_precompute = [
+    const TRIGGER_ANGLES: [f32; 4] = [
         1. * std::f32::consts::FRAC_PI_8,
         3. * std::f32::consts::FRAC_PI_8,
         5. * std::f32::consts::FRAC_PI_8,
@@ -169,13 +169,13 @@ async fn right_stick() {
         } else if distance_to_origin >= CONFIG.right_stick_trigger_zone && pressed_input_name.is_none() {
             let stick_angle = y.atan2(x);
 
-            pressed_input_name = if stick_angle >= trigger_angle_precompute[1] && stick_angle <= trigger_angle_precompute[2] {
+            pressed_input_name = if stick_angle >= TRIGGER_ANGLES[1] && stick_angle <= TRIGGER_ANGLES[2] {
                 Some("right_stick_up")
-            } else if stick_angle >= -trigger_angle_precompute[2] && stick_angle <= -trigger_angle_precompute[1] {
+            } else if stick_angle >= -TRIGGER_ANGLES[2] && stick_angle <= -TRIGGER_ANGLES[1] {
                 Some("right_stick_down")
-            } else if stick_angle >= trigger_angle_precompute[3] || stick_angle <= -trigger_angle_precompute[3] {
+            } else if stick_angle >= TRIGGER_ANGLES[3] || stick_angle <= -TRIGGER_ANGLES[3] {
                 Some("right_stick_left")
-            } else if stick_angle >= -trigger_angle_precompute[0] && stick_angle <= trigger_angle_precompute[0] {
+            } else if stick_angle >= -TRIGGER_ANGLES[0] && stick_angle <= TRIGGER_ANGLES[0] {
                 Some("right_stick_right")
             } else {
                 None
