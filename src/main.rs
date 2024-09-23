@@ -116,7 +116,7 @@ fn press_input(input_name: &str, is_press_down: bool) {
                     if let Some(components) = shlex::split(cmdline);
                     if !components.is_empty();
                     then {
-                        std::process::Command::new(&components[0]).args(&components[1..]).spawn().unwrap();
+                        std::process::Command::new(&components[0]).args(&components[1..]).spawn().ok();
                     }
                 }
             }

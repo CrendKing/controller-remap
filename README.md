@@ -64,11 +64,11 @@ south = { repeat = 'Return' }
 west = { repeat = 'PageDown' }
 east = { repeat = 'Space' }
 left_bumper = { mouse = 'Left' }
-right_bumper = { mouse = 'Right' }
-left_trigger = { sync = ['Control'] }
+right_bumper = { sync = ['Control'] }
+left_trigger = { mouse = 'Right' }
 right_trigger = { mouse = 'Middle' }
 start = { sync = ['Shift'] }
-left_thumb = { seq = ['Control', 'R'] }
+left_thumb = { seq = ['Control', 'Meta', 'O'] }
 right_thumb = { seq = ['Control', 'W'] }
 dpad_up = { repeat = 'UpArrow' }
 dpad_down = { repeat = 'DownArrow' }
@@ -77,15 +77,15 @@ dpad_right = { repeat = 'RightArrow' }
 right_stick_up = { seq = ['F5'] }
 right_stick_down = { seq = ['Control', 'C'] }
 right_stick_left = { seq = ['Control', 'V'] }
-right_stick_right = { seq = ['Control', 'Tab'] }
+right_stick_right = { seq = ['Control', 'Alt', 'Tab'] }
 
 [alt]
 north = { seq = ['Home'] }
-south = { repeat = 'Backspace' }
-west = { seq = ['End'] }
-east = { seq = ['Alt', 'F4'] }
+south = { seq = ['End'] }
+west = { repeat = 'Backspace' }
+east = { repeat = 'Delete' }
 right_stick_up = { seq = ['Escape'] }
-right_stick_down = { command = 'notepad.exe' }
-right_stick_left = { seq = ['Meta', 'D'] }
+right_stick_down = { seq = ['Meta', 'D'] }
+right_stick_left = { seq = ['Control', 'Alt', { Unicode = '1' }] }
 right_stick_right = { seq = ['Meta', 'X'] }
 ```
