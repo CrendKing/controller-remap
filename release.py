@@ -2,18 +2,20 @@ if __name__ == '__main__':
     from pathlib import Path
     import os
     import subprocess
-    import sys
 
     app_name = Path(__file__).parent.name
-    subprocess.run(('taskkill', '/F', '/IM', f'{app_name}.exe'), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(['taskkill', '/F', '/IM', f'{app_name}.exe'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    out_dir = Path(__file__).with_name('out') / 'release'
-    config_path = Path(__file__).with_name('config') / f'{app_name}.toml'
-    config_link_target = out_dir / f'{app_name}.toml'
+    for build_type in ('debug', 'release'):
+        target_dir = Path(__file__).with_name('target') / build_type
+        target_dir.mkdir(parents=True, exist_ok=True)
 
-    if not config_link_target.exists():
-        os.link(config_path, config_link_target)
+        source_config = Path(__file__).with_name('config') / f'{app_name}.toml'
+        target_config = target_dir / f'{app_name}.toml'
 
-    sys.path.insert(1, str(Path(__file__).parents[1]))
-    import Script.cargo_build
-    Script.cargo_build.process(['cargo', 'build', '--release'])
+        if target_config.exists() and target_config.stat().st_nlink == 1:
+            target_config.unlink()
+        if not target_config.exists():
+            os.link(source_config, target_config)
+
+    subprocess.check_call(['cargo', 'build', '--release'])

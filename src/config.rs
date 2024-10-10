@@ -7,11 +7,11 @@ use if_chain::if_chain;
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Remap {
-    Seq(Box<[enigo::Key]>),
-    Sync(Box<[enigo::Key]>),
+    Seq(Vec<enigo::Key>),
+    Sync(Vec<enigo::Key>),
     Repeat(enigo::Key),
     Mouse(enigo::Button),
-    Command(Box<str>),
+    Command(String),
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -34,10 +34,10 @@ pub struct Config {
     pub right_stick_trigger_zone: f32,
     pub right_stick_dead_zone: f32,
 
-    pub alternative_activator: Option<Box<str>>,
+    pub alternative_activator: Option<String>,
 
-    pub main: HashMap<Box<str>, Remap>,
-    pub alt: HashMap<Box<str>, Remap>,
+    pub main: HashMap<String, Remap>,
+    pub alt: HashMap<String, Remap>,
 }
 
 impl Config {

@@ -1,3 +1,5 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod atomic_f32;
 mod config;
 
@@ -7,6 +9,7 @@ use std::sync::LazyLock;
 use enigo::{Direction, Enigo, Keyboard, Mouse};
 use gilrs::{Axis, Event, EventType, Gilrs};
 use if_chain::if_chain;
+use single_instance::SingleInstance;
 
 use crate::atomic_f32::*;
 use crate::config::*;
@@ -46,7 +49,7 @@ static REPEAT_KEY_ABORT_HANDLE: std::sync::Mutex<Option<tokio::task::AbortHandle
 fn press_input(input_name: &str, is_press_down: bool) {
     if_chain! {
         if let Some(activator) = &CONFIG.alternative_activator;
-        if input_name == activator.as_ref();
+        if input_name == activator.to_lowercase();
         then {
             IS_ALTERNATIVE_ACTIVE.store(is_press_down, Ordering::Relaxed);
             return;
@@ -215,7 +218,7 @@ fn get_button_input_name(button: gilrs::Button) -> Option<&'static str> {
 
 #[tokio::main(worker_threads = 3)]
 async fn main() {
-    let instance = single_instance::SingleInstance::new(&std::env::current_exe().unwrap().file_name().unwrap().to_string_lossy()).unwrap();
+    let instance = SingleInstance::new(&std::env::current_exe().unwrap().file_name().unwrap().to_string_lossy()).unwrap();
     if !instance.is_single() {
         return;
     }
