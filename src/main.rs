@@ -1,3 +1,5 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod atomic_f32;
 mod config;
 
@@ -46,7 +48,7 @@ static REPEAT_KEY_ABORT_HANDLE: std::sync::Mutex<Option<tokio::task::AbortHandle
 fn press_input(input_name: &str, is_press_down: bool) {
     if_chain! {
         if let Some(activator) = &CONFIG.alternative_activator;
-        if input_name == activator.as_ref();
+        if input_name == activator;
         then {
             IS_ALTERNATIVE_ACTIVE.store(is_press_down, Ordering::Relaxed);
             return;

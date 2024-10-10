@@ -1,5 +1,4 @@
 *.lnk
 Cargo.lock
 config/
-out/
 target/
