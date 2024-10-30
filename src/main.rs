@@ -39,8 +39,8 @@ static RIGHT_STICK_COORD: Coordinate = Coordinate::new();
 
 static CONFIG: LazyLock<Config> = LazyLock::new(|| {
     let config_path = std::env::current_exe().unwrap().with_extension("toml");
-    let config_str = std::fs::read_to_string(&config_path).unwrap_or_else(|_| panic!("Unable to open config file at {}", config_path.display()));
-    let config = toml::from_str::<Config>(&config_str).unwrap();
+    let config_str = std::fs::read_to_string(&config_path).unwrap_or_default();
+    let config = toml::from_str::<Config>(&config_str).expect("Unable to parse the config file");
     config.check_error().unwrap()
 });
 static ENIGO: LazyLock<std::sync::Mutex<Enigo>> = LazyLock::new(|| std::sync::Mutex::new(Enigo::new(&enigo::Settings::default()).unwrap()));
@@ -268,5 +268,17 @@ async fn main() {
             }
         })
         .ok();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{left_stick, press_input, right_stick};
+
+    #[test]
+    fn test_baseline() {
+        press_input("", true);
+        left_stick();
+        right_stick();
     }
 }
