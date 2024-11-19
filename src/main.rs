@@ -3,8 +3,12 @@
 mod atomic_f32;
 mod config;
 
+use std::env::current_exe;
+use std::fs::File;
+use std::process::exit;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::LazyLock;
+use std::time::Duration;
 
 use enigo::{Direction, Enigo, Keyboard, Mouse};
 use gilrs::{Axis, Event, EventType, Gilrs};
@@ -32,6 +36,9 @@ impl Coordinate {
         self.y.reset();
     }
 }
+
+const INPUT_LOOP_INTERVAL: Duration = Duration::from_secs(3);
+const EXIT_FILE_NAME: &str = "delete_me_to_exit";
 
 static IS_ALTERNATIVE_ACTIVE: AtomicBool = AtomicBool::new(false);
 static LEFT_STICK_COORD: Coordinate = Coordinate::new();
@@ -193,6 +200,14 @@ async fn right_stick() {
     }
 }
 
+fn cleanup() {
+    let mut enigo = ENIGO.lock().unwrap();
+
+    for held_key in enigo.held().0 {
+        enigo.key(held_key, Direction::Release).unwrap();
+    }
+}
+
 fn get_button_input_name(button: gilrs::Button) -> Option<&'static str> {
     match button {
         gilrs::Button::North => Some("north"),
@@ -218,7 +233,7 @@ fn get_button_input_name(button: gilrs::Button) -> Option<&'static str> {
 
 #[tokio::main(worker_threads = 3)]
 async fn main() {
-    let instance = SingleInstance::new(&std::env::current_exe().unwrap().file_name().unwrap().to_string_lossy()).unwrap();
+    let instance = SingleInstance::new(&current_exe().unwrap().file_name().unwrap().to_string_lossy()).unwrap();
     if !instance.is_single() {
         return;
     }
@@ -231,6 +246,9 @@ async fn main() {
         sigaction(Signal::SIGCHLD, &SigAction::new(SigHandler::SigDfl, SaFlags::SA_NOCLDWAIT, SigSet::empty())).unwrap();
     }
 
+    let exit_path = current_exe().unwrap().with_file_name(EXIT_FILE_NAME);
+    File::create(&exit_path).unwrap();
+
     tokio::spawn(left_stick());
     tokio::spawn(right_stick());
 
@@ -238,7 +256,7 @@ async fn main() {
         std::panic::catch_unwind(|| {
             let mut gilrs = Gilrs::new().unwrap();
             loop {
-                if let Some(Event { event, .. }) = gilrs.next_event_blocking(None) {
+                if let Some(Event { event, .. }) = gilrs.next_event_blocking(Some(INPUT_LOOP_INTERVAL)) {
                     match event {
                         EventType::Disconnected => {
                             IS_ALTERNATIVE_ACTIVE.store(false, Ordering::Relaxed);
@@ -264,6 +282,9 @@ async fn main() {
                         },
                         _ => (),
                     }
+                } else if !exit_path.exists() {
+                    cleanup();
+                    exit(0);
                 }
             }
         })
