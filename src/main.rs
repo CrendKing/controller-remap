@@ -3,8 +3,10 @@
 mod atomic_f32;
 mod config;
 
+use std::env::current_exe;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::LazyLock;
+use std::time::Duration;
 
 use enigo::{Direction, Enigo, Keyboard, Mouse};
 use gilrs::{Axis, Event, EventType, Gilrs};
@@ -32,6 +34,8 @@ impl Coordinate {
         self.y.reset();
     }
 }
+
+const INPUT_LOOP_INTERVAL: Duration = Duration::from_secs(3);
 
 static IS_ALTERNATIVE_ACTIVE: AtomicBool = AtomicBool::new(false);
 static LEFT_STICK_COORD: Coordinate = Coordinate::new();
@@ -218,7 +222,7 @@ fn get_button_input_name(button: gilrs::Button) -> Option<&'static str> {
 
 #[tokio::main(worker_threads = 3)]
 async fn main() {
-    let instance = SingleInstance::new(&std::env::current_exe().unwrap().file_name().unwrap().to_string_lossy()).unwrap();
+    let instance = SingleInstance::new(&current_exe().unwrap().file_name().unwrap().to_string_lossy()).unwrap();
     if !instance.is_single() {
         return;
     }
@@ -238,12 +242,18 @@ async fn main() {
         std::panic::catch_unwind(|| {
             let mut gilrs = Gilrs::new().unwrap();
             loop {
-                if let Some(Event { event, .. }) = gilrs.next_event_blocking(None) {
+                if let Some(Event { event, .. }) = gilrs.next_event_blocking(Some(INPUT_LOOP_INTERVAL)) {
                     match event {
                         EventType::Disconnected => {
                             IS_ALTERNATIVE_ACTIVE.store(false, Ordering::Relaxed);
                             LEFT_STICK_COORD.reset();
                             RIGHT_STICK_COORD.reset();
+
+                            let mut enigo = ENIGO.lock().unwrap();
+
+                            for held_key in enigo.held().0 {
+                                enigo.key(held_key, Direction::Release).unwrap();
+                            }
                         }
                         EventType::ButtonPressed(button, ..) => {
                             if let Some(input_name) = get_button_input_name(button) {
