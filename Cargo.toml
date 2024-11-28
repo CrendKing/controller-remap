@@ -8,7 +8,7 @@ edition = '2021'
 [dependencies]
 duration-str = '*'
 enigo = { version = '*', default-features = false, features = ['serde', 'wayland'] }
-gilrs = { version = '*', features = ['serde'] }
+gilrs = { version = '*', default-features = false, features = ['serde', 'xinput'] }
 if_chain = '*'
 serde = '*'
 shlex = '*'
