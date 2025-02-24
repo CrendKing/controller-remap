@@ -1,8 +1,8 @@
-if __name__ == '__main__':
-    from pathlib import Path
-    import os
-    import subprocess
+import os
+import subprocess
+from pathlib import Path
 
+if __name__ == '__main__':
     app_name = Path(__file__).parent.name
     subprocess.run(['taskkill', '/F', '/IM', f'{app_name}.exe'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
