@@ -4,8 +4,8 @@ mod atomic_f32;
 mod config;
 
 use std::env::current_exe;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::LazyLock;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use enigo::{Direction, Enigo, Keyboard, Mouse};
@@ -283,12 +283,15 @@ async fn main() {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use crate::{left_stick, press_input, right_stick};
 
-    #[test]
-    fn test_baseline() {
+    #[tokio::test]
+    async fn test_baseline() {
         press_input("", true);
-        left_stick();
-        right_stick();
+
+        tokio::time::timeout(Duration::from_secs(1), left_stick()).await.ok();
+        tokio::time::timeout(Duration::from_secs(1), right_stick()).await.ok();
     }
 }

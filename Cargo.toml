@@ -3,7 +3,7 @@ name = 'controller-remap'
 description = 'Remap controller to keyboard and mouse inputs'
 license-file = 'LICENSE'
 version = '1.0.0'
-edition = '2021'
+edition = '2024'
 
 [dependencies]
 duration-str = '*'
