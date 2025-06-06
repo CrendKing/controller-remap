@@ -1,4 +1,5 @@
-*.lnk
-Cargo.lock
 config/
 target/
+
+*.lnk
+Cargo.lock

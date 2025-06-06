@@ -9,11 +9,11 @@ edition = '2024'
 duration-str = '*'
 enigo = { version = '*', default-features = false, features = ['serde', 'wayland'] }
 gilrs = { version = '*', default-features = false, features = ['serde', 'xinput'] }
-if_chain = '*'
-serde = '*'
-shlex = '*'
-single-instance = '*'
-tokio = { version = '*', features = ['macros', 'rt-multi-thread', 'time'] }
+if_chain = { version = '*', default-features = false }
+serde = { version = '*', default-features = false }
+shlex = { version = '*', default-features = false }
+single-instance = { version = '*', default-features = false }
+tokio = { version = '*', default-features = false, features = ['macros', 'rt-multi-thread', 'time'] }
 toml = '*'
 
 [target.'cfg(target_os = "linux")'.dependencies]
