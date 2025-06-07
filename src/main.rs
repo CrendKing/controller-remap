@@ -175,17 +175,18 @@ async fn right_stick() {
             }
         } else if distance_to_origin >= CONFIG.right_stick_trigger_zone && pressed_input_name.is_none() {
             let stick_angle = y.atan2(x);
+            let abs_stick_angle = stick_angle.abs();
 
-            pressed_input_name = if stick_angle >= TRIGGER_ANGLES[1] && stick_angle <= TRIGGER_ANGLES[2] {
-                Some("right_stick_up")
-            } else if stick_angle >= -TRIGGER_ANGLES[2] && stick_angle <= -TRIGGER_ANGLES[1] {
-                Some("right_stick_down")
-            } else if stick_angle >= TRIGGER_ANGLES[3] || stick_angle <= -TRIGGER_ANGLES[3] {
-                Some("right_stick_left")
-            } else if stick_angle >= -TRIGGER_ANGLES[0] && stick_angle <= TRIGGER_ANGLES[0] {
-                Some("right_stick_right")
+            pressed_input_name = if (TRIGGER_ANGLES[1]..=TRIGGER_ANGLES[2]).contains(&abs_stick_angle) {
+                if stick_angle > 0.0 { Some("right_stick_up") } else { Some("right_stick_down") }
             } else {
-                None
+                if abs_stick_angle >= TRIGGER_ANGLES[3] {
+                    Some("right_stick_left")
+                } else if abs_stick_angle <= TRIGGER_ANGLES[0] {
+                    Some("right_stick_right")
+                } else {
+                    None
+                }
             };
 
             if let Some(input_name) = pressed_input_name {
