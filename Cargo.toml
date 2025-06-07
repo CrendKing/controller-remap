@@ -12,7 +12,7 @@ gilrs = { version = '*', default-features = false, features = ['serde', 'xinput'
 if_chain = { version = '*', default-features = false }
 serde = { version = '*', default-features = false }
 shlex = { version = '*', default-features = false }
-single-instance = { version = '*', default-features = false }
+singleton-process = '*'
 tokio = { version = '*', default-features = false, features = ['macros', 'rt-multi-thread', 'time'] }
 toml = '*'
 
