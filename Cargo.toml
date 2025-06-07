@@ -12,9 +12,17 @@ gilrs = { version = '*', default-features = false, features = ['serde', 'xinput'
 if_chain = { version = '*', default-features = false }
 serde = { version = '*', default-features = false }
 shlex = { version = '*', default-features = false }
-single-instance = { version = '*', default-features = false }
 tokio = { version = '*', default-features = false, features = ['macros', 'rt-multi-thread', 'time'] }
 toml = '*'
 
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = '*', default-features = false, features = [
+    'Win32_Foundation',
+    'Win32_Security',
+    'Win32_System_Memory',
+    'Win32_System_Threading',
+] }
+
 [target.'cfg(target_os = "linux")'.dependencies]
-nix = { version = '*', default-features = false, features = ['signal'] }
+libc = { version = '*', default-features = false }
+nix = { version = '*', default-features = false, features = ['fs', 'signal'] }

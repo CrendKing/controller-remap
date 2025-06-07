@@ -2,8 +2,8 @@
 
 mod atomic_f32;
 mod config;
+mod single_instance;
 
-use std::env::current_exe;
 use std::sync::LazyLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -11,10 +11,10 @@ use std::time::Duration;
 use enigo::{Direction, Enigo, Keyboard, Mouse};
 use gilrs::{Axis, Event, EventType, Gilrs};
 use if_chain::if_chain;
-use single_instance::SingleInstance;
 
 use crate::atomic_f32::*;
 use crate::config::*;
+use crate::single_instance::*;
 
 struct Coordinate {
     x: AtomicF32,
@@ -223,10 +223,7 @@ fn get_button_input_name(button: gilrs::Button) -> Option<&'static str> {
 
 #[tokio::main(worker_threads = 3)]
 async fn main() {
-    let instance = SingleInstance::new(&current_exe().unwrap().file_name().unwrap().to_string_lossy()).unwrap();
-    if !instance.is_single() {
-        return;
-    }
+    std::mem::forget(SingleInstance::try_new(true).unwrap());
 
     // we don't care about the terminal state of the user command processes, and don't want them to become zombies
     // set SA_NOCLDWAIT to the SIGCHLD signal
