@@ -33,7 +33,7 @@ impl Coordinate {
     }
 }
 
-const INPUT_LOOP_INTERVAL: Duration = Duration::from_secs(3);
+const INPUT_LOOP_TIMEOUT: Duration = Duration::from_secs(3);
 
 static IS_ALTERNATIVE_ACTIVE: AtomicBool = AtomicBool::new(false);
 static LEFT_STICK_COORD: Coordinate = Coordinate::new();
@@ -137,11 +137,11 @@ async fn left_stick() {
         let x = LEFT_STICK_COORD.x.load();
         let y = LEFT_STICK_COORD.y.load();
         let distance_to_origin = (x * x + y * y).sqrt();
-        let dead_zone_shrink_ratio = (1. - (CONFIG.left_stick_dead_zone) / distance_to_origin).max(0.);
+        let dead_zone_shrink_ratio = (1.0 - (CONFIG.left_stick_dead_zone) / distance_to_origin).max(0.0);
         let delta_x = x * dead_zone_shrink_ratio * curr_mouse_speed;
         let delta_y = y * dead_zone_shrink_ratio * curr_mouse_speed;
 
-        if delta_x != 0. || delta_y != 0. {
+        if delta_x != 0.0 || delta_y != 0.0 {
             ENIGO.lock().unwrap().move_mouse(delta_x as i32, -delta_y as i32, enigo::Coordinate::Rel).unwrap();
             curr_mouse_speed = (curr_mouse_speed + mouse_acceleration).min(CONFIG.mouse_max_speed);
         } else {
@@ -154,10 +154,10 @@ async fn left_stick() {
 
 async fn right_stick() {
     const TRIGGER_ANGLES: [f32; 4] = [
-        1. * std::f32::consts::FRAC_PI_8,
-        3. * std::f32::consts::FRAC_PI_8,
-        5. * std::f32::consts::FRAC_PI_8,
-        7. * std::f32::consts::FRAC_PI_8,
+        1.0 * std::f32::consts::FRAC_PI_8,
+        3.0 * std::f32::consts::FRAC_PI_8,
+        5.0 * std::f32::consts::FRAC_PI_8,
+        7.0 * std::f32::consts::FRAC_PI_8,
     ];
     let mut pressed_input_name = None;
 
@@ -238,7 +238,7 @@ async fn main() {
         std::panic::catch_unwind(|| {
             let mut gilrs = Gilrs::new().unwrap();
             loop {
-                if let Some(Event { event, .. }) = gilrs.next_event_blocking(Some(INPUT_LOOP_INTERVAL)) {
+                if let Some(Event { event, .. }) = gilrs.next_event_blocking(Some(INPUT_LOOP_TIMEOUT)) {
                     match event {
                         EventType::Disconnected => {
                             IS_ALTERNATIVE_ACTIVE.store(false, Ordering::Relaxed);
