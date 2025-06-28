@@ -9,7 +9,6 @@ edition = '2024'
 duration-str = '*'
 enigo = { version = '*', default-features = false, features = ['serde', 'wayland'] }
 gilrs = { version = '*', default-features = false, features = ['serde', 'xinput'] }
-if_chain = { version = '*', default-features = false }
 serde = { version = '*', default-features = false }
 shlex = { version = '*', default-features = false }
 singleton-process = '*'

@@ -9,7 +9,6 @@ use std::time::Duration;
 
 use enigo::{Direction, Enigo, Keyboard, Mouse};
 use gilrs::{Axis, Event, EventType, Gilrs};
-use if_chain::if_chain;
 
 use crate::atomic_f32::*;
 use crate::config::*;
@@ -49,13 +48,11 @@ static ENIGO: LazyLock<std::sync::Mutex<Enigo>> = LazyLock::new(|| std::sync::Mu
 static REPEAT_KEY_ABORT_HANDLE: std::sync::Mutex<Option<tokio::task::AbortHandle>> = std::sync::Mutex::new(None);
 
 fn press_input(input_name: &str, is_press_down: bool) {
-    if_chain! {
-        if let Some(activator) = &CONFIG.alternative_activator;
-        if input_name == activator.to_lowercase();
-        then {
-            IS_ALTERNATIVE_ACTIVE.store(is_press_down, Ordering::Relaxed);
-            return;
-        }
+    if let Some(activator) = &CONFIG.alternative_activator
+        && input_name == activator.to_lowercase()
+    {
+        IS_ALTERNATIVE_ACTIVE.store(is_press_down, Ordering::Relaxed);
+        return;
     }
 
     if let Some(remap) = CONFIG.get_remap(input_name, IS_ALTERNATIVE_ACTIVE.load(Ordering::Relaxed)) {
@@ -116,13 +113,11 @@ fn press_input(input_name: &str, is_press_down: bool) {
                     .unwrap();
             }
             Remap::Command(cmdline) => {
-                if_chain! {
-                    if is_press_down;
-                    if let Some(components) = shlex::split(cmdline);
-                    if !components.is_empty();
-                    then {
-                        std::process::Command::new(&components[0]).args(&components[1..]).spawn().ok();
-                    }
+                if is_press_down
+                    && let Some(components) = shlex::split(cmdline)
+                    && !components.is_empty()
+                {
+                    std::process::Command::new(&components[0]).args(&components[1..]).spawn().ok();
                 }
             }
         }
@@ -177,14 +172,12 @@ async fn right_stick() {
 
             pressed_input_name = if (TRIGGER_ANGLES[1]..=TRIGGER_ANGLES[2]).contains(&abs_stick_angle) {
                 if stick_angle > 0.0 { Some("right_stick_up") } else { Some("right_stick_down") }
+            } else if abs_stick_angle >= TRIGGER_ANGLES[3] {
+                Some("right_stick_left")
+            } else if abs_stick_angle <= TRIGGER_ANGLES[0] {
+                Some("right_stick_right")
             } else {
-                if abs_stick_angle >= TRIGGER_ANGLES[3] {
-                    Some("right_stick_left")
-                } else if abs_stick_angle <= TRIGGER_ANGLES[0] {
-                    Some("right_stick_right")
-                } else {
-                    None
-                }
+                None
             };
 
             if let Some(input_name) = pressed_input_name {
