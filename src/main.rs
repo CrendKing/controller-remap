@@ -38,12 +38,7 @@ static IS_ALTERNATIVE_ACTIVE: AtomicBool = AtomicBool::new(false);
 static LEFT_STICK_COORD: Coordinate = Coordinate::new();
 static RIGHT_STICK_COORD: Coordinate = Coordinate::new();
 
-static CONFIG: LazyLock<Config> = LazyLock::new(|| {
-    let config_path = std::env::current_exe().unwrap().with_extension("toml");
-    let config_str = std::fs::read_to_string(&config_path).unwrap_or_default();
-    let config = toml::from_str::<Config>(&config_str).expect("Unable to parse the config file");
-    config.check_error().unwrap()
-});
+static CONFIG: LazyLock<Config> = LazyLock::new(|| Config::try_new().unwrap());
 static ENIGO: LazyLock<std::sync::Mutex<Enigo>> = LazyLock::new(|| std::sync::Mutex::new(Enigo::new(&enigo::Settings::default()).unwrap()));
 static REPEAT_KEY_ABORT_HANDLE: std::sync::Mutex<Option<tokio::task::AbortHandle>> = std::sync::Mutex::new(None);
 

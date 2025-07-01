@@ -47,22 +47,26 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn check_error(self) -> std::result::Result<Self, &'static str> {
-        if self.left_stick_dead_zone <= 0. || self.right_stick_trigger_zone <= 0. || self.right_stick_dead_zone <= 0. {
+    pub fn try_new() -> std::result::Result<Self, &'static str> {
+        let config_path = std::env::current_exe().unwrap().with_extension("toml");
+        let config_str = std::fs::read_to_string(&config_path).unwrap_or_default();
+        let config_obj = toml::from_str::<Config>(&config_str).expect("Unable to parse the config file");
+
+        if config_obj.left_stick_dead_zone <= 0. || config_obj.right_stick_trigger_zone <= 0. || config_obj.right_stick_dead_zone <= 0. {
             return Err("Negative zone size");
         }
 
-        if self.right_stick_trigger_zone < self.right_stick_dead_zone {
+        if config_obj.right_stick_trigger_zone < config_obj.right_stick_dead_zone {
             return Err("Trigger zone smaller than dead zone");
         }
 
-        if let Some(activator) = &self.alternative_activator
-            && self.main.contains_key(activator)
+        if let Some(activator) = &config_obj.alternative_activator
+            && config_obj.main.contains_key(activator)
         {
             return Err("Activator for alternative set is remapped");
         }
 
-        Ok(self)
+        Ok(config_obj)
     }
 
     pub fn get_remap(&self, input: &str, is_alternative: bool) -> Option<&Remap> {
