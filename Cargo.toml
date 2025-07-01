@@ -10,6 +10,7 @@ duration-str = '*'
 enigo = { version = '*', default-features = false, features = ['serde', 'wayland'] }
 gilrs = { version = '*', default-features = false, features = ['serde', 'xinput'] }
 serde = { version = '*', default-features = false }
+serde-inline-default = { version = '*', default-features = false }
 shlex = { version = '*', default-features = false }
 singleton-process = '*'
 tokio = { version = '*', default-features = false, features = ['macros', 'rt-multi-thread', 'time'] }

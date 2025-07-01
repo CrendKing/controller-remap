@@ -269,11 +269,11 @@ async fn main() {
 mod tests {
     use std::time::Duration;
 
-    use crate::{left_stick, press_input, right_stick};
+    use super::*;
 
     #[tokio::test]
     async fn test_baseline() {
-        press_input("", true);
+        press_input("north", true);
 
         tokio::time::timeout(Duration::from_secs(1), left_stick()).await.ok();
         tokio::time::timeout(Duration::from_secs(1), right_stick()).await.ok();

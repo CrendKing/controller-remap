@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use duration_str::deserialize_duration;
+use serde_inline_default::serde_inline_default;
 
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -13,36 +14,44 @@ pub enum Remap {
     Command(String),
 }
 
-#[derive(Debug, Default, serde::Deserialize)]
-#[serde(default)]
+// TODO: Remove when serde-rs/serde#368 resolves
+#[serde_inline_default]
+#[derive(Debug, serde::Deserialize)]
 pub struct Config {
-    #[serde(deserialize_with = "deserialize_duration", default = "Config::default_key_repeat_initial_delay")]
+    #[serde(deserialize_with = "deserialize_duration")]
+    #[serde_inline_default(Duration::from_millis(400))]
     pub key_repeat_initial_delay: Duration,
-    #[serde(deserialize_with = "deserialize_duration", default = "Config::default_key_repeat_sub_delay")]
+    #[serde(deserialize_with = "deserialize_duration")]
+    #[serde_inline_default(Duration::from_millis(40))]
     pub key_repeat_sub_delay: Duration,
 
-    #[serde(deserialize_with = "deserialize_duration", default = "Config::default_left_stick_poll_interval")]
+    #[serde(deserialize_with = "deserialize_duration")]
+    #[serde_inline_default(Duration::from_millis(10))]
     pub left_stick_poll_interval: Duration,
-    #[serde(default = "Config::default_left_stick_dead_zone")]
+    #[serde_inline_default(0.05)]
     pub left_stick_dead_zone: f32,
 
-    #[serde(default = "Config::default_mouse_initial_speed")]
+    #[serde_inline_default(10.0)]
     pub mouse_initial_speed: f32,
-    #[serde(default = "Config::default_mouse_max_speed")]
+    #[serde_inline_default(20.0)]
     pub mouse_max_speed: f32,
-    #[serde(default = "Config::default_mouse_ticks_to_reach_max_speed")]
+    #[serde_inline_default(30.0)]
     pub mouse_ticks_to_reach_max_speed: f32,
 
-    #[serde(deserialize_with = "deserialize_duration", default = "Config::default_right_stick_poll_interval")]
+    #[serde(deserialize_with = "deserialize_duration")]
+    #[serde_inline_default(Duration::from_millis(50))]
     pub right_stick_poll_interval: Duration,
-    #[serde(default = "Config::default_right_stick_trigger_zone")]
+    #[serde_inline_default(0.3)]
     pub right_stick_trigger_zone: f32,
-    #[serde(default = "Config::default_right_stick_dead_zone")]
+    #[serde_inline_default(0.1)]
     pub right_stick_dead_zone: f32,
 
+    #[serde(default)]
     pub alternative_activator: Option<String>,
 
+    #[serde(default)]
     pub main: HashMap<String, Remap>,
+    #[serde(default)]
     pub alt: HashMap<String, Remap>,
 }
 
@@ -71,45 +80,5 @@ impl Config {
 
     pub fn get_remap(&self, input: &str, is_alternative: bool) -> Option<&Remap> {
         if !is_alternative { &self.main } else { &self.alt }.get(input)
-    }
-
-    fn default_key_repeat_initial_delay() -> Duration {
-        Duration::from_millis(400)
-    }
-
-    fn default_key_repeat_sub_delay() -> Duration {
-        Duration::from_millis(40)
-    }
-
-    fn default_left_stick_poll_interval() -> Duration {
-        Duration::from_millis(10)
-    }
-
-    fn default_left_stick_dead_zone() -> f32 {
-        0.05
-    }
-
-    fn default_mouse_initial_speed() -> f32 {
-        10.0
-    }
-
-    fn default_mouse_max_speed() -> f32 {
-        20.0
-    }
-
-    fn default_mouse_ticks_to_reach_max_speed() -> f32 {
-        30.0
-    }
-
-    fn default_right_stick_poll_interval() -> Duration {
-        Duration::from_millis(50)
-    }
-
-    fn default_right_stick_trigger_zone() -> f32 {
-        0.3
-    }
-
-    fn default_right_stick_dead_zone() -> f32 {
-        0.1
     }
 }
