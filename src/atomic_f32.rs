@@ -10,14 +10,14 @@ impl AtomicF32 {
     }
 
     pub fn store(&self, value: f32) {
-        self.storage.store(value.to_bits(), Ordering::Relaxed)
+        self.storage.store(value.to_bits(), Ordering::Release)
     }
 
     pub fn load(&self) -> f32 {
-        f32::from_bits(self.storage.load(Ordering::Relaxed))
+        f32::from_bits(self.storage.load(Ordering::Acquire))
     }
 
     pub fn reset(&self) {
-        self.storage.store(0, Ordering::Relaxed);
+        self.storage.store(0, Ordering::Release);
     }
 }
