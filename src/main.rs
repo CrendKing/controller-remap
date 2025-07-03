@@ -85,10 +85,14 @@ fn press_input(input_name: &str, is_press_down: bool) {
                 }
 
                 if is_press_down {
-                    ENIGO.lock().unwrap().key(*key, Direction::Click).unwrap();
-
+                    /*
+                        Tokio Task is ideal tool for the repeat key use case:
+                        * Small blocking code running on a separate thread
+                        * Can be cancelled at any time
+                    */
                     *abort_handle_lock = Some(
-                        tokio::spawn(async {
+                        tokio::task::spawn(async {
+                            ENIGO.lock().unwrap().key(*key, Direction::Click).unwrap();
                             tokio::time::sleep(CONFIG.key_repeat_initial_delay).await;
 
                             loop {
@@ -119,7 +123,7 @@ fn press_input(input_name: &str, is_press_down: bool) {
     }
 }
 
-async fn left_stick() {
+fn left_stick() {
     let mouse_acceleration = (CONFIG.mouse_max_speed - CONFIG.mouse_initial_speed) / CONFIG.mouse_ticks_to_reach_max_speed;
     let mut curr_mouse_speed = CONFIG.mouse_initial_speed;
 
@@ -138,11 +142,11 @@ async fn left_stick() {
             curr_mouse_speed = CONFIG.mouse_initial_speed;
         }
 
-        tokio::time::sleep(CONFIG.left_stick_poll_interval).await;
+        std::thread::sleep(CONFIG.left_stick_poll_interval);
     }
 }
 
-async fn right_stick() {
+fn right_stick() {
     const TRIGGER_ANGLES: [f32; 4] = [
         1.0 * std::f32::consts::FRAC_PI_8,
         3.0 * std::f32::consts::FRAC_PI_8,
@@ -180,7 +184,7 @@ async fn right_stick() {
             }
         }
 
-        tokio::time::sleep(CONFIG.right_stick_poll_interval).await;
+        std::thread::sleep(CONFIG.right_stick_poll_interval);
     }
 }
 
@@ -207,7 +211,7 @@ fn get_button_input_name(button: gilrs::Button) -> Option<&'static str> {
     }
 }
 
-#[tokio::main(worker_threads = 3)]
+#[tokio::main(worker_threads = 1)]
 async fn main() {
     std::mem::forget(singleton_process::SingletonProcess::try_new(None, true).unwrap());
 
@@ -219,8 +223,8 @@ async fn main() {
         sigaction(Signal::SIGCHLD, &SigAction::new(SigHandler::SigDfl, SaFlags::SA_NOCLDWAIT, SigSet::empty())).unwrap();
     }
 
-    tokio::spawn(left_stick());
-    tokio::spawn(right_stick());
+    std::thread::spawn(left_stick);
+    std::thread::spawn(right_stick);
 
     loop {
         std::panic::catch_unwind(|| {
@@ -275,7 +279,9 @@ mod tests {
     async fn test_baseline() {
         press_input("north", true);
 
-        tokio::time::timeout(Duration::from_secs(1), left_stick()).await.ok();
-        tokio::time::timeout(Duration::from_secs(1), right_stick()).await.ok();
+        std::thread::spawn(left_stick);
+        std::thread::spawn(right_stick);
+
+        std::thread::sleep(Duration::from_secs(1));
     }
 }
