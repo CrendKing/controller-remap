@@ -5,7 +5,6 @@ mod config;
 
 use std::sync::LazyLock;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
 
 use enigo::{Direction, Enigo, Keyboard, Mouse};
 use gilrs::{Axis, Event, EventType, Gilrs};
@@ -31,8 +30,6 @@ impl Coordinate {
         self.y.reset();
     }
 }
-
-const INPUT_LOOP_TIMEOUT: Duration = Duration::from_secs(3);
 
 static IS_ALTERNATIVE_ACTIVE: AtomicBool = AtomicBool::new(false);
 static LEFT_STICK_COORD: Coordinate = Coordinate::new();
@@ -229,39 +226,37 @@ async fn main() {
     loop {
         std::panic::catch_unwind(|| {
             let mut gilrs = Gilrs::new().unwrap();
-            loop {
-                if let Some(Event { event, .. }) = gilrs.next_event_blocking(Some(INPUT_LOOP_TIMEOUT)) {
-                    match event {
-                        EventType::Disconnected => {
-                            IS_ALTERNATIVE_ACTIVE.store(false, Ordering::Relaxed);
-                            LEFT_STICK_COORD.reset();
-                            RIGHT_STICK_COORD.reset();
+            while let Some(Event { event, .. }) = gilrs.next_event_blocking(None) {
+                match event {
+                    EventType::Disconnected => {
+                        IS_ALTERNATIVE_ACTIVE.store(false, Ordering::Relaxed);
+                        LEFT_STICK_COORD.reset();
+                        RIGHT_STICK_COORD.reset();
 
-                            let mut enigo = ENIGO.lock().unwrap();
+                        let mut enigo = ENIGO.lock().unwrap();
 
-                            for held_key in enigo.held().0 {
-                                enigo.key(held_key, Direction::Release).unwrap();
-                            }
+                        for held_key in enigo.held().0 {
+                            enigo.key(held_key, Direction::Release).unwrap();
                         }
-                        EventType::ButtonPressed(button, ..) => {
-                            if let Some(input_name) = get_button_input_name(button) {
-                                press_input(input_name, true);
-                            }
-                        }
-                        EventType::ButtonReleased(button, ..) => {
-                            if let Some(input_name) = get_button_input_name(button) {
-                                press_input(input_name, false);
-                            }
-                        }
-                        EventType::AxisChanged(axis, value, ..) => match axis {
-                            Axis::LeftStickX => LEFT_STICK_COORD.x.store(value),
-                            Axis::LeftStickY => LEFT_STICK_COORD.y.store(value),
-                            Axis::RightStickX => RIGHT_STICK_COORD.x.store(value),
-                            Axis::RightStickY => RIGHT_STICK_COORD.y.store(value),
-                            _ => (),
-                        },
-                        _ => (),
                     }
+                    EventType::ButtonPressed(button, ..) => {
+                        if let Some(input_name) = get_button_input_name(button) {
+                            press_input(input_name, true);
+                        }
+                    }
+                    EventType::ButtonReleased(button, ..) => {
+                        if let Some(input_name) = get_button_input_name(button) {
+                            press_input(input_name, false);
+                        }
+                    }
+                    EventType::AxisChanged(axis, value, ..) => match axis {
+                        Axis::LeftStickX => LEFT_STICK_COORD.x.store(value),
+                        Axis::LeftStickY => LEFT_STICK_COORD.y.store(value),
+                        Axis::RightStickX => RIGHT_STICK_COORD.x.store(value),
+                        Axis::RightStickY => RIGHT_STICK_COORD.y.store(value),
+                        _ => (),
+                    },
+                    _ => (),
                 }
             }
         })
