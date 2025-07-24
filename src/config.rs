@@ -19,7 +19,7 @@ pub enum Remap {
 #[derive(Debug, serde::Deserialize)]
 pub struct Config {
     #[serde(deserialize_with = "deserialize_duration")]
-    #[serde_inline_default(Duration::from_millis(400))]
+    #[serde_inline_default(Duration::from_millis(250))]
     pub key_repeat_initial_delay: Duration,
     #[serde(deserialize_with = "deserialize_duration")]
     #[serde_inline_default(Duration::from_millis(40))]

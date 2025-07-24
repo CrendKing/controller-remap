@@ -39,6 +39,19 @@ static CONFIG: LazyLock<Config> = LazyLock::new(|| Config::try_new().unwrap());
 static ENIGO: LazyLock<std::sync::Mutex<Enigo>> = LazyLock::new(|| std::sync::Mutex::new(Enigo::new(&enigo::Settings::default()).unwrap()));
 static REPEAT_KEY_ABORT_HANDLE: std::sync::Mutex<Option<tokio::task::AbortHandle>> = std::sync::Mutex::new(None);
 
+trait EnigoInputResultExt<T> {
+    fn ignore_simulate_error(self) -> Option<T>;
+}
+
+impl<T> EnigoInputResultExt<T> for enigo::InputResult<T> {
+    fn ignore_simulate_error(self) -> Option<T> {
+        match self {
+            Err(enigo::InputError::Simulate(_)) => None,
+            _ => Some(self.unwrap()),
+        }
+    }
+}
+
 fn press_input(input_name: &str, is_press_down: bool) {
     if let Some(activator) = &CONFIG.alternative_activator
         && input_name == activator.to_lowercase()
@@ -54,10 +67,10 @@ fn press_input(input_name: &str, is_press_down: bool) {
                     let mut enigo = ENIGO.lock().unwrap();
 
                     for key in seq.iter() {
-                        enigo.key(*key, Direction::Press).unwrap();
+                        enigo.key(*key, Direction::Press).ignore_simulate_error();
                     }
                     for key in seq.iter().rev() {
-                        enigo.key(*key, Direction::Release).unwrap();
+                        enigo.key(*key, Direction::Release).ignore_simulate_error();
                     }
                 }
             }
@@ -66,11 +79,11 @@ fn press_input(input_name: &str, is_press_down: bool) {
 
                 if is_press_down {
                     for key in seq.iter() {
-                        enigo.key(*key, Direction::Press).unwrap();
+                        enigo.key(*key, Direction::Press).ignore_simulate_error();
                     }
                 } else {
                     for key in seq.iter().rev() {
-                        enigo.key(*key, Direction::Release).unwrap();
+                        enigo.key(*key, Direction::Release).ignore_simulate_error();
                     }
                 }
             }
@@ -84,16 +97,16 @@ fn press_input(input_name: &str, is_press_down: bool) {
                 if is_press_down {
                     /*
                         Tokio Task is ideal tool for the repeat key use case:
-                        * Small blocking code running on a separate thread
-                        * Can be cancelled at any time
+                        - Small blocking code running on a separate thread
+                        - Can be cancelled at any time
                     */
                     *abort_handle_lock = Some(
                         tokio::task::spawn(async {
-                            ENIGO.lock().unwrap().key(*key, Direction::Click).unwrap();
+                            ENIGO.lock().unwrap().key(*key, Direction::Click).ignore_simulate_error();
                             tokio::time::sleep(CONFIG.key_repeat_initial_delay).await;
 
                             loop {
-                                ENIGO.lock().unwrap().key(*key, Direction::Click).unwrap();
+                                ENIGO.lock().unwrap().key(*key, Direction::Click).ignore_simulate_error();
                                 tokio::time::sleep(CONFIG.key_repeat_sub_delay).await;
                             }
                         })
@@ -106,7 +119,7 @@ fn press_input(input_name: &str, is_press_down: bool) {
                     .lock()
                     .unwrap()
                     .button(*button, if is_press_down { Direction::Press } else { Direction::Release })
-                    .unwrap();
+                    .ignore_simulate_error();
             }
             Remap::Command(cmdline) => {
                 if is_press_down
@@ -133,7 +146,11 @@ fn left_stick() {
         let delta_y = y * dead_zone_shrink_ratio * curr_mouse_speed;
 
         if delta_x != 0.0 || delta_y != 0.0 {
-            ENIGO.lock().unwrap().move_mouse(delta_x as i32, -delta_y as i32, enigo::Coordinate::Rel).unwrap();
+            ENIGO
+                .lock()
+                .unwrap()
+                .move_mouse(delta_x as i32, -delta_y as i32, enigo::Coordinate::Rel)
+                .ignore_simulate_error();
             curr_mouse_speed = (curr_mouse_speed + mouse_acceleration).min(CONFIG.mouse_max_speed);
         } else {
             curr_mouse_speed = CONFIG.mouse_initial_speed;
