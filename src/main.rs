@@ -223,44 +223,42 @@ async fn main() {
     std::thread::spawn(left_stick);
     std::thread::spawn(right_stick);
 
+    let mut gilrs = Gilrs::new().unwrap();
+
     loop {
-        std::panic::catch_unwind(|| {
-            let mut gilrs = Gilrs::new().unwrap();
-            while let Some(Event { event, .. }) = gilrs.next_event_blocking(None) {
-                match event {
-                    EventType::Disconnected => {
-                        IS_ALTERNATIVE_ACTIVE.store(false, Ordering::Relaxed);
-                        LEFT_STICK_COORD.reset();
-                        RIGHT_STICK_COORD.reset();
+        if let Some(Event { event, .. }) = gilrs.next_event_blocking(None) {
+            match event {
+                EventType::Disconnected => {
+                    IS_ALTERNATIVE_ACTIVE.store(false, Ordering::Relaxed);
+                    LEFT_STICK_COORD.reset();
+                    RIGHT_STICK_COORD.reset();
 
-                        let mut enigo = ENIGO.lock().unwrap();
+                    let mut enigo = ENIGO.lock().unwrap();
 
-                        for held_key in enigo.held().0 {
-                            enigo.key(held_key, Direction::Release).unwrap();
-                        }
+                    for held_key in enigo.held().0 {
+                        enigo.key(held_key, Direction::Release).unwrap();
                     }
-                    EventType::ButtonPressed(button, ..) => {
-                        if let Some(input_name) = get_button_input_name(button) {
-                            press_input(input_name, true);
-                        }
-                    }
-                    EventType::ButtonReleased(button, ..) => {
-                        if let Some(input_name) = get_button_input_name(button) {
-                            press_input(input_name, false);
-                        }
-                    }
-                    EventType::AxisChanged(axis, value, ..) => match axis {
-                        Axis::LeftStickX => LEFT_STICK_COORD.x.store(value),
-                        Axis::LeftStickY => LEFT_STICK_COORD.y.store(value),
-                        Axis::RightStickX => RIGHT_STICK_COORD.x.store(value),
-                        Axis::RightStickY => RIGHT_STICK_COORD.y.store(value),
-                        _ => (),
-                    },
-                    _ => (),
                 }
+                EventType::ButtonPressed(button, ..) => {
+                    if let Some(input_name) = get_button_input_name(button) {
+                        press_input(input_name, true);
+                    }
+                }
+                EventType::ButtonReleased(button, ..) => {
+                    if let Some(input_name) = get_button_input_name(button) {
+                        press_input(input_name, false);
+                    }
+                }
+                EventType::AxisChanged(axis, value, ..) => match axis {
+                    Axis::LeftStickX => LEFT_STICK_COORD.x.store(value),
+                    Axis::LeftStickY => LEFT_STICK_COORD.y.store(value),
+                    Axis::RightStickX => RIGHT_STICK_COORD.x.store(value),
+                    Axis::RightStickY => RIGHT_STICK_COORD.y.store(value),
+                    _ => (),
+                },
+                _ => (),
             }
-        })
-        .ok();
+        }
     }
 }
 
