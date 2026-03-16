@@ -21,3 +21,21 @@ impl AtomicF32 {
         self.storage.store(0, Ordering::Release);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_baseline() {
+        let x = AtomicF32::new();
+        assert_eq!(x.load(), 0.0);
+
+        let target = 1.234;
+        x.store(target);
+        assert_eq!(x.load(), target);
+
+        x.reset();
+        assert_eq!(x.load(), 0.0);
+    }
+}
