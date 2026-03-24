@@ -59,7 +59,7 @@ impl Config {
     pub fn try_new() -> std::result::Result<Self, &'static str> {
         let config_path = std::env::current_exe().unwrap().with_extension("toml");
         let config_str = std::fs::read_to_string(&config_path).unwrap_or_default();
-        let config_obj = toml::from_str::<Config>(&config_str).expect("Unable to parse the config file");
+        let config_obj = toml_edit::de::from_str::<Config>(&config_str).expect("Unable to parse the config file");
 
         if config_obj.left_stick_dead_zone <= 0. || config_obj.right_stick_trigger_zone <= 0. || config_obj.right_stick_dead_zone <= 0. {
             return Err("Negative zone size");
