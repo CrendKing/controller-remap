@@ -210,6 +210,13 @@ fn get_button_input_name(button: gilrs::Button) -> Option<&'static str> {
 async fn main() -> anyhow::Result<()> {
     std::mem::forget(singleton_process::SingletonProcess::try_new(None, true)?);
 
+    #[cfg(target_os = "linux")]
+    fern::Dispatch::new()
+        .format(|out, message, record| out.finish(format_args!("[{}][{}] {}", record.level(), record.target(), message)))
+        .level(log::LevelFilter::Debug)
+        .chain(fern::Output::writer(Box::new(strip_ansi_escapes::Writer::new(fern::log_file("/tmp/controller-remap.log")?)), "\n"))
+        .apply()?;
+
     std::panic::set_hook(Box::new(|panic_info| {
         println!("{panic_info}\n\nStack trace:\n{}", std::backtrace::Backtrace::force_capture());
     }));

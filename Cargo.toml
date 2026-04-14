@@ -19,3 +19,7 @@ toml_edit = { version = '*', features = ['serde'] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 nix = { version = '*', features = ['signal'] }
+
+fern = '*'
+log = '*'
+strip-ansi-escapes = '*'
