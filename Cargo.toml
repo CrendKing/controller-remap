@@ -6,7 +6,8 @@ version = '1.0.0'
 edition = '2024'
 
 [dependencies]
-duration-str = '*'
+anyhow = '*'
+duration-str = { version = '*', features = ['lowercase'] }
 enigo = { version = '*', default-features = false, features = ['serde', 'wayland'] }
 gilrs = { version = '*', default-features = false, features = ['serde', 'xinput'] }
 serde = '*'

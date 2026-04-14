@@ -9,8 +9,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use enigo::{Direction, Enigo, Keyboard, Mouse};
 use gilrs::{Axis, Event, EventType, Gilrs};
 
-use crate::atomic_f32::*;
-use crate::config::*;
+use crate::atomic_f32::AtomicF32;
+use crate::config::{Config, Remap};
 
 struct Coordinate {
     x: AtomicF32,
@@ -39,25 +39,12 @@ static CONFIG: LazyLock<Config> = LazyLock::new(|| Config::try_new().unwrap());
 static ENIGO: LazyLock<std::sync::Mutex<Enigo>> = LazyLock::new(|| std::sync::Mutex::new(Enigo::new(&enigo::Settings::default()).unwrap()));
 static REPEAT_KEY_ABORT_HANDLE: std::sync::Mutex<Option<tokio::task::AbortHandle>> = std::sync::Mutex::new(None);
 
-trait EnigoInputResultExt<T> {
-    fn ignore_simulate_error(self) -> Option<T>;
-}
-
-impl<T> EnigoInputResultExt<T> for enigo::InputResult<T> {
-    fn ignore_simulate_error(self) -> Option<T> {
-        match self {
-            Err(enigo::InputError::Simulate(_)) => None,
-            _ => Some(self.unwrap()),
-        }
-    }
-}
-
-fn press_input(input_name: &str, is_press_down: bool) {
+fn press_input(input_name: &str, is_press_down: bool) -> anyhow::Result<()> {
     if let Some(activator) = &CONFIG.alternative_activator
         && input_name == activator.to_lowercase()
     {
         IS_ALTERNATIVE_ACTIVE.store(is_press_down, Ordering::Relaxed);
-        return;
+        return Ok(());
     }
 
     if let Some(remap) = CONFIG.get_remap(input_name, IS_ALTERNATIVE_ACTIVE.load(Ordering::Relaxed)) {
@@ -67,10 +54,10 @@ fn press_input(input_name: &str, is_press_down: bool) {
                     let mut enigo = ENIGO.lock().unwrap();
 
                     for key in seq.iter() {
-                        enigo.key(*key, Direction::Press).ignore_simulate_error();
+                        enigo.key(*key, Direction::Press)?;
                     }
                     for key in seq.iter().rev() {
-                        enigo.key(*key, Direction::Release).ignore_simulate_error();
+                        enigo.key(*key, Direction::Release)?;
                     }
                 }
             }
@@ -79,11 +66,11 @@ fn press_input(input_name: &str, is_press_down: bool) {
 
                 if is_press_down {
                     for key in seq.iter() {
-                        enigo.key(*key, Direction::Press).ignore_simulate_error();
+                        enigo.key(*key, Direction::Press)?;
                     }
                 } else {
                     for key in seq.iter().rev() {
-                        enigo.key(*key, Direction::Release).ignore_simulate_error();
+                        enigo.key(*key, Direction::Release)?;
                     }
                 }
             }
@@ -102,11 +89,11 @@ fn press_input(input_name: &str, is_press_down: bool) {
                     */
                     *abort_handle_lock = Some(
                         tokio::task::spawn(async {
-                            ENIGO.lock().unwrap().key(*key, Direction::Click).ignore_simulate_error();
+                            ENIGO.lock().unwrap().key(*key, Direction::Click).unwrap();
                             tokio::time::sleep(CONFIG.key_repeat_initial_delay).await;
 
                             loop {
-                                ENIGO.lock().unwrap().key(*key, Direction::Click).ignore_simulate_error();
+                                ENIGO.lock().unwrap().key(*key, Direction::Click).unwrap();
                                 tokio::time::sleep(CONFIG.key_repeat_sub_delay).await;
                             }
                         })
@@ -115,11 +102,7 @@ fn press_input(input_name: &str, is_press_down: bool) {
                 }
             }
             Remap::Mouse(button) => {
-                ENIGO
-                    .lock()
-                    .unwrap()
-                    .button(*button, if is_press_down { Direction::Press } else { Direction::Release })
-                    .ignore_simulate_error();
+                ENIGO.lock().unwrap().button(*button, if is_press_down { Direction::Press } else { Direction::Release })?;
             }
             Remap::Command(cmdline) => {
                 if is_press_down
@@ -131,9 +114,11 @@ fn press_input(input_name: &str, is_press_down: bool) {
             }
         }
     }
+
+    Ok(())
 }
 
-fn left_stick() {
+fn left_stick() -> anyhow::Result<()> {
     let mouse_acceleration = (CONFIG.mouse_max_speed - CONFIG.mouse_initial_speed) / CONFIG.mouse_ticks_to_reach_max_speed;
     let mut curr_mouse_speed = CONFIG.mouse_initial_speed;
 
@@ -146,11 +131,7 @@ fn left_stick() {
         let delta_y = y * dead_zone_shrink_ratio * curr_mouse_speed;
 
         if delta_x != 0.0 || delta_y != 0.0 {
-            ENIGO
-                .lock()
-                .unwrap()
-                .move_mouse(delta_x as i32, -delta_y as i32, enigo::Coordinate::Rel)
-                .ignore_simulate_error();
+            ENIGO.lock().unwrap().move_mouse(delta_x as i32, -delta_y as i32, enigo::Coordinate::Rel)?;
             curr_mouse_speed = (curr_mouse_speed + mouse_acceleration).min(CONFIG.mouse_max_speed);
         } else {
             curr_mouse_speed = CONFIG.mouse_initial_speed;
@@ -160,7 +141,7 @@ fn left_stick() {
     }
 }
 
-fn right_stick() {
+fn right_stick() -> anyhow::Result<()> {
     const TRIGGER_ANGLES: [f32; 4] = [
         1.0 * std::f32::consts::FRAC_PI_8,
         3.0 * std::f32::consts::FRAC_PI_8,
@@ -176,7 +157,7 @@ fn right_stick() {
 
         if distance_to_origin <= CONFIG.right_stick_dead_zone {
             if let Some(input_name) = pressed_input_name {
-                press_input(input_name, false);
+                press_input(input_name, false)?;
                 pressed_input_name = None;
             }
         } else if distance_to_origin >= CONFIG.right_stick_trigger_zone && pressed_input_name.is_none() {
@@ -194,7 +175,7 @@ fn right_stick() {
             };
 
             if let Some(input_name) = pressed_input_name {
-                press_input(input_name, true);
+                press_input(input_name, true)?;
             }
         }
 
@@ -226,15 +207,19 @@ fn get_button_input_name(button: gilrs::Button) -> Option<&'static str> {
 }
 
 #[tokio::main(worker_threads = 1)]
-async fn main() {
-    std::mem::forget(singleton_process::SingletonProcess::try_new(None, true).unwrap());
+async fn main() -> anyhow::Result<()> {
+    std::mem::forget(singleton_process::SingletonProcess::try_new(None, true)?);
+
+    std::panic::set_hook(Box::new(|panic_info| {
+        println!("{panic_info}\n\nStack trace:\n{}", std::backtrace::Backtrace::force_capture());
+    }));
 
     // we don't care about the terminal state of the user command processes, and don't want them to become zombies
     // set SA_NOCLDWAIT to the SIGCHLD signal
     #[cfg(target_os = "linux")]
     unsafe {
         use nix::sys::signal::*;
-        sigaction(Signal::SIGCHLD, &SigAction::new(SigHandler::SigDfl, SaFlags::SA_NOCLDWAIT, SigSet::empty())).unwrap();
+        sigaction(Signal::SIGCHLD, &SigAction::new(SigHandler::SigDfl, SaFlags::SA_NOCLDWAIT, SigSet::empty()))?;
     }
 
     std::thread::spawn(left_stick);
@@ -253,17 +238,17 @@ async fn main() {
                     let mut enigo = ENIGO.lock().unwrap();
 
                     for held_key in enigo.held().0 {
-                        enigo.key(held_key, Direction::Release).unwrap();
+                        enigo.key(held_key, Direction::Release)?;
                     }
                 }
                 EventType::ButtonPressed(button, ..) => {
                     if let Some(input_name) = get_button_input_name(button) {
-                        press_input(input_name, true);
+                        press_input(input_name, true)?;
                     }
                 }
                 EventType::ButtonReleased(button, ..) => {
                     if let Some(input_name) = get_button_input_name(button) {
-                        press_input(input_name, false);
+                        press_input(input_name, false)?;
                     }
                 }
                 EventType::AxisChanged(axis, value, ..) => match axis {
@@ -286,12 +271,14 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_baseline() {
-        press_input("north", true);
+    async fn test_baseline() -> anyhow::Result<()> {
+        press_input("north", true)?;
 
         std::thread::spawn(left_stick);
         std::thread::spawn(right_stick);
 
         std::thread::sleep(Duration::from_secs(1));
+
+        Ok(())
     }
 }
