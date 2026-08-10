@@ -2,9 +2,10 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use duration_str::deserialize_duration;
+use serde::Deserialize;
 use serde_inline_default::serde_inline_default;
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Remap {
     Seq(Vec<enigo::Key>),
@@ -16,7 +17,7 @@ pub enum Remap {
 
 // TODO: Remove when serde-rs/serde#368 resolves
 #[serde_inline_default]
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct Config {
     #[serde(deserialize_with = "deserialize_duration")]
     #[serde_inline_default(Duration::from_millis(250))]

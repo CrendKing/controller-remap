@@ -219,8 +219,8 @@ async fn main() -> anyhow::Result<()> {
     #[cfg(target_os = "linux")]
     unsafe {
         use nix::sys::signal::*;
-        sigaction(Signal::SIGCHLD, &SigAction::new(SigHandler::SigDfl, SaFlags::SA_NOCLDWAIT, SigSet::empty()))?;
-    }
+        sigaction(Signal::SIGCHLD, &SigAction::new(SigHandler::SigDfl, SaFlags::SA_NOCLDWAIT, SigSet::empty()))
+    }?;
 
     std::thread::spawn(left_stick);
     std::thread::spawn(right_stick);
