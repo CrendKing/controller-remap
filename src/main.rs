@@ -3,6 +3,7 @@
 mod atomic_f32;
 mod config;
 
+use std::f32::consts::FRAC_PI_8;
 use std::sync::LazyLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -121,33 +122,40 @@ fn press_input(input_name: &str, is_press_down: bool) -> anyhow::Result<()> {
 fn left_stick() -> anyhow::Result<()> {
     let mouse_acceleration = (CONFIG.mouse_max_speed - CONFIG.mouse_initial_speed) / CONFIG.mouse_ticks_to_reach_max_speed;
     let mut curr_mouse_speed = CONFIG.mouse_initial_speed;
+    let dead_zone_sq = CONFIG.left_stick_dead_zone * CONFIG.left_stick_dead_zone;
 
     loop {
         let x = LEFT_STICK_COORD.x.load();
         let y = LEFT_STICK_COORD.y.load();
-        let distance_to_origin = (x * x + y * y).sqrt();
-        let dead_zone_shrink_ratio = (1.0 - (CONFIG.left_stick_dead_zone) / distance_to_origin).max(0.0);
-        let delta_x = x * dead_zone_shrink_ratio * curr_mouse_speed;
-        let delta_y = y * dead_zone_shrink_ratio * curr_mouse_speed;
 
-        if delta_x != 0.0 || delta_y != 0.0 {
-            ENIGO.lock().unwrap().move_mouse(delta_x as i32, -delta_y as i32, enigo::Coordinate::Rel)?;
-            curr_mouse_speed = (curr_mouse_speed + mouse_acceleration).min(CONFIG.mouse_max_speed);
+        let distance_to_origin_sq = x * x + y * y;
+        let is_mouse_moved = if distance_to_origin_sq > dead_zone_sq {
+            let dead_zone_shrink_ratio = 1.0 - CONFIG.left_stick_dead_zone / distance_to_origin_sq.sqrt();
+            let delta_x = (x * dead_zone_shrink_ratio * curr_mouse_speed).round() as i32;
+            let delta_y = (y * dead_zone_shrink_ratio * curr_mouse_speed).round() as i32;
+
+            if delta_x != 0 || delta_y != 0 {
+                ENIGO.lock().unwrap().move_mouse(delta_x, -delta_y, enigo::Coordinate::Rel)?;
+                true
+            } else {
+                false
+            }
         } else {
-            curr_mouse_speed = CONFIG.mouse_initial_speed;
-        }
+            false
+        };
+
+        curr_mouse_speed = if is_mouse_moved {
+            (curr_mouse_speed + mouse_acceleration).min(CONFIG.mouse_max_speed)
+        } else {
+            CONFIG.mouse_initial_speed
+        };
 
         std::thread::sleep(CONFIG.left_stick_poll_interval);
     }
 }
 
 fn right_stick() -> anyhow::Result<()> {
-    const TRIGGER_ANGLES: [f32; 4] = [
-        1.0 * std::f32::consts::FRAC_PI_8,
-        3.0 * std::f32::consts::FRAC_PI_8,
-        5.0 * std::f32::consts::FRAC_PI_8,
-        7.0 * std::f32::consts::FRAC_PI_8,
-    ];
+    const TRIGGER_ANGLES: [f32; 4] = [1.0 * FRAC_PI_8, 3.0 * FRAC_PI_8, 5.0 * FRAC_PI_8, 7.0 * FRAC_PI_8];
     let mut pressed_input_name = None;
 
     loop {

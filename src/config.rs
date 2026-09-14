@@ -62,12 +62,16 @@ impl Config {
         let config_str = std::fs::read_to_string(&config_path).unwrap_or_default();
         let config_obj = toml_edit::de::from_str::<Config>(&config_str).expect("Unable to parse the config file");
 
-        if config_obj.left_stick_dead_zone <= 0. || config_obj.right_stick_trigger_zone <= 0. || config_obj.right_stick_dead_zone <= 0. {
-            return Err("Negative zone size");
+        if config_obj.left_stick_dead_zone <= 0.0 || config_obj.right_stick_trigger_zone <= 0.0 || config_obj.right_stick_dead_zone <= 0.0 {
+            return Err("Dead zone and trigger zone sizes must be positive");
         }
 
         if config_obj.right_stick_trigger_zone < config_obj.right_stick_dead_zone {
-            return Err("Trigger zone smaller than dead zone");
+            return Err("Trigger zone must not be smaller than dead zone");
+        }
+
+        if config_obj.mouse_initial_speed > config_obj.mouse_max_speed {
+            return Err("Mouse initial speed must not be higher than the max speed");
         }
 
         if let Some(activator) = &config_obj.alternative_activator
