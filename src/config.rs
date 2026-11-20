@@ -57,7 +57,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn try_new() -> std::result::Result<Self, &'static str> {
+    pub fn new() -> std::result::Result<Self, &'static str> {
         let config_path = std::env::current_exe().unwrap().with_extension("toml");
         let config_str = std::fs::read_to_string(&config_path).unwrap_or_default();
         let config_obj = toml_edit::de::from_str::<Config>(&config_str).expect("Unable to parse the config file");
