@@ -57,27 +57,27 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new() -> std::result::Result<Self, &'static str> {
+    pub fn new() -> anyhow::Result<Self> {
         let config_path = std::env::current_exe().unwrap().with_extension("toml");
         let config_str = std::fs::read_to_string(&config_path).unwrap_or_default();
         let config_obj = toml_edit::de::from_str::<Config>(&config_str).expect("Unable to parse the config file");
 
         if config_obj.left_stick_dead_zone <= 0.0 || config_obj.right_stick_trigger_zone <= 0.0 || config_obj.right_stick_dead_zone <= 0.0 {
-            return Err("Dead zone and trigger zone sizes must be positive");
+            anyhow::bail!("Dead zone and trigger zone sizes must be positive");
         }
 
         if config_obj.right_stick_trigger_zone < config_obj.right_stick_dead_zone {
-            return Err("Trigger zone must not be smaller than dead zone");
+            anyhow::bail!("Trigger zone must not be smaller than dead zone");
         }
 
         if config_obj.mouse_initial_speed > config_obj.mouse_max_speed {
-            return Err("Mouse initial speed must not be higher than the max speed");
+            anyhow::bail!("Mouse initial speed must not be higher than the max speed");
         }
 
         if let Some(activator) = &config_obj.alternative_activator
             && config_obj.main.contains_key(activator)
         {
-            return Err("Activator for alternative set is remapped");
+            anyhow::bail!("Activator for alternative set is remapped");
         }
 
         Ok(config_obj)

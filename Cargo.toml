@@ -14,7 +14,7 @@ serde = '*'
 serde-inline-default = '*'
 shlex = { version = '*', default-features = false }
 singleton-process = '*'
-tokio = { version = '*', features = ['macros', 'rt-multi-thread', 'time'] }
+tokio = { version = '*', features = ['macros', 'rt-multi-thread', 'sync', 'time'] }
 toml_edit = { version = '*', features = ['serde'] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
