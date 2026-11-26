@@ -10,7 +10,7 @@ impl AtomicF32 {
     }
 
     pub fn store(&self, value: f32) {
-        self.storage.store(value.to_bits(), Ordering::Release)
+        self.storage.store(value.to_bits(), Ordering::Release);
     }
 
     pub fn load(&self) -> f32 {
@@ -27,7 +27,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_baseline() {
+    async fn basic() {
         let x = AtomicF32::new();
         assert_eq!(x.load(), 0.0);
 

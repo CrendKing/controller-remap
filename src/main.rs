@@ -6,7 +6,7 @@ mod config;
 use std::f32::consts::FRAC_PI_8;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use enigo::{Direction, Enigo, Keyboard, Mouse};
+use enigo::{Direction, Enigo, Keyboard as _, Mouse as _};
 use gilrs::{Axis, Event, EventType, Gilrs};
 
 use crate::atomic_f32::AtomicF32;
@@ -87,7 +87,7 @@ async fn press_input(input_name: &str, is_press_down: bool) -> anyhow::Result<()
                 if is_press_down {
                     let mut enigo_guard = get_context().enigo.lock().await;
 
-                    for key in seq.iter() {
+                    for key in seq {
                         enigo_guard.key(*key, Direction::Press)?;
                     }
                     for key in seq.iter().rev() {
@@ -99,7 +99,7 @@ async fn press_input(input_name: &str, is_press_down: bool) -> anyhow::Result<()
                 let mut enigo_guard = get_context().enigo.lock().await;
 
                 if is_press_down {
-                    for key in seq.iter() {
+                    for key in seq {
                         enigo_guard.key(*key, Direction::Press)?;
                     }
                 } else {
@@ -145,7 +145,7 @@ async fn press_input(input_name: &str, is_press_down: bool) -> anyhow::Result<()
                     && let Some(components) = shlex::split(cmdline)
                     && !components.is_empty()
                 {
-                    std::process::Command::new(&components[0]).args(&components[1..]).spawn().ok();
+                    let _ = std::process::Command::new(&components[0]).args(&components[1..]).spawn();
                 }
             }
         }
@@ -300,7 +300,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_baseline() -> anyhow::Result<()> {
+    async fn basic() -> anyhow::Result<()> {
         press_input("north", true).await?;
 
         tokio::task::spawn(left_stick());

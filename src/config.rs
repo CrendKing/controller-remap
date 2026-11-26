@@ -58,9 +58,9 @@ pub struct Config {
 
 impl Config {
     pub fn new() -> anyhow::Result<Self> {
-        let config_path = std::env::current_exe().unwrap().with_extension("toml");
+        let config_path = std::env::current_exe()?.with_extension("toml");
         let config_str = std::fs::read_to_string(&config_path).unwrap_or_default();
-        let config_obj = toml_edit::de::from_str::<Config>(&config_str).expect("Unable to parse the config file");
+        let config_obj = toml_edit::de::from_str::<Config>(&config_str).map_err(|error| anyhow::anyhow!("Unable to parse the config file: {error}"))?;
 
         if config_obj.left_stick_dead_zone <= 0.0 || config_obj.right_stick_trigger_zone <= 0.0 || config_obj.right_stick_dead_zone <= 0.0 {
             anyhow::bail!("Dead zone and trigger zone sizes must be positive");
@@ -84,6 +84,6 @@ impl Config {
     }
 
     pub fn get_remap(&self, input: &str, is_alternative: bool) -> Option<&Remap> {
-        if !is_alternative { &self.main } else { &self.alt }.get(input)
+        if is_alternative { &self.alt } else { &self.main }.get(input)
     }
 }
